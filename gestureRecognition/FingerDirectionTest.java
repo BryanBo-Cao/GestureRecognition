@@ -1,6 +1,6 @@
 // open terminal and execute this command to connect leapmotion
 // command: "LeapControlPanel"
-package com;
+package gestureRecognition;
 import java.io.IOException;
 import java.lang.Math;
 import com.leapmotion.leap.*;

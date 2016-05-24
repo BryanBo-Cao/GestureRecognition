@@ -1,4 +1,4 @@
-package com;
+package gestureRecognition;
 import java.io.IOException;
 import java.lang.Math;
 import com.leapmotion.leap.*;
