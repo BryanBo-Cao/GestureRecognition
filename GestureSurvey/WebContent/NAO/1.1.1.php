@@ -12,14 +12,21 @@
         <link type="text/css" rel="stylesheet" href="../bootstrap/css/bootstrap.min.css" media="screen"/>
         <link type="text/css" rel="stylesheet" href="../bootstrap/css/bootstrap-responsive.css"/>
         <link type="text/css" rel="sytlesheet" href="../bootstrap/css/bootstrap-responsive.min.css"/>
-        <link type="text/css" rel="stylesheet" href="../bootstrap-datetimepicker-master/css/bootstrap-datetimepicker.css"/>
-        <link type="text/css" rel="stylesheet" href="../bootstrap-datetimepicker-master/css/bootstrap-datetimepicker.min.css"/>
         <script src="../bootstrap/js/bootstrap.min.js"></script>
-        <script src="../bootstrap/js/jquery-1.9.1.js"></script>
-        <script src="../bootstrap-datetimepicker-master/js/bootstrap-datetimepicker.js"></script>
-        <script src="../bootstrap-datetimepicker-master/js/bootstrap-datetimepicker.min.js"></script>
-        <script type="text/javascript" src="../js/validateForm.js"></script>
+<!--         <script src="../bootstrap/js/jquery-1.9.1.js"></script> -->
+<!--         <script type="text/javascript" src="../js/validateForm.js"></script> -->
+        <script src="../js/jquery-1.12.4.js"></script>
    		<script src="../js/videoRecorder.js"></script>
+   		<style>
+			a#downloadLink {
+			  display: block;
+			  margin: 0 0 1em 0;
+			  min-height: 1.2em;
+			}
+			p#data {
+			  min-height: 6em;
+			}
+		</style>
     </head>
 
     <body onload="statess()" id="mybody" align="center">
@@ -67,7 +74,7 @@
 							<video controls autoplay></video><br>
 						</div>
 						<div name="buttons">
-							<button class="btn btn-primary"id="rec" onclick="onBtnRecordClicked()">Record</button>
+							<button class="btn btn-primary" id="rec" onclick="onBtnRecordClicked()">Record</button>
 						  	<button class="btn" id="pauseRes"   onclick="onPauseResumeClicked()" disabled>Pause</button>
 						  	<button class="btn btn-danger" id="stop"  onclick="onBtnStopClicked()" disabled>Stop & Save</button>
 							<button class="btn btn-success" id="next" >Next</button>
@@ -77,6 +84,7 @@
 							<a id="downloadLink" download="mediarecorder.webm" name="mediarecorder.webm" href></a>
 							<p id="data"></p>
 						</div>
+						
 					</div>
 					<!-- end ====== recorder div -->
                     
