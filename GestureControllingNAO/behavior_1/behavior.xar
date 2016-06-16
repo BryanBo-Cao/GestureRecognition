@@ -1,0 +1,2513 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<ChoregrapheProject xmlns="http://www.aldebaran-robotics.com/schema/choregraphe/project.xsd" xar_version="3">
+    <Box name="root" id="-1" localization="8" tooltip="Root box of Choregraphe&apos;s behavior. Highest level possible." x="0" y="0">
+        <bitmap>media/images/box/root.png</bitmap>
+        <script language="4">
+            <content>
+                <![CDATA[]]>
+</content>
+        </script>
+        <Input name="onLoad" type="1" type_size="1" nature="0" inner="1" tooltip="Signal sent when diagram is loaded." id="1" />
+        <Input name="onStart" type="1" type_size="1" nature="2" inner="0" tooltip="Box behavior starts when a signal is received on this input." id="2" />
+        <Input name="onStop" type="1" type_size="1" nature="3" inner="0" tooltip="Box behavior stops when a signal is received on this input." id="3" />
+        <Output name="onStopped" type="1" type_size="1" nature="1" inner="0" tooltip="Signal sent when box behavior is finished." id="4" />
+        <Timeline enable="0">
+            <BehaviorLayer name="behavior_layer1">
+                <BehaviorKeyframe name="keyframe1" index="1">
+                    <Diagram scale="70.7107">
+                        <Box name="Move Toward" id="7" localization="8" tooltip="Make the robot move in the direction you set in parameters.&#x0A;&#x0A;!!Warning!! the robot will not stop moving by himself. You need to either set x, y and theta to 0 or stop the box to stop him.&#x0A;&#x0A;Note: You can set the period of move direction update in parameters." x="582" y="200">
+                            <bitmap>media/images/box/movement/walk_forward.png</bitmap>
+                            <script language="4">
+                                <content>
+                                    <![CDATA[class MyClass(GeneratedClass):
+
+
+    def __init__(self):
+        GeneratedClass.__init__(self, False)
+
+    def onLoad(self):
+        import threading
+        self.motion = ALProxy("ALMotion")
+        self.x = 0
+        self.y = 0
+        self.theta = 0
+        self.ptask = qi.PeriodicTask()
+        self.lock = threading.RLock()
+
+    def onUnload(self):
+        with self.lock:
+            self.ptask.stop()
+            self.x = 0
+            self.y = 0
+            self.theta = 0
+            self.motion.moveToward(0, 0, 0)
+            self.motion.waitUntilMoveIsFinished()
+
+    def onInput_onStop(self):
+        with self.lock:
+            self.onUnload()
+            self.onStopped()
+
+    def onInput_onStart(self):
+        with self.lock:
+            period = self.getParameter("Period of direction update (s)")
+            us_period = int(period*1000000)
+
+            self.ptask.compensateCallbackTime(True)
+            self.ptask.setCallback(self.updateMovement)
+            self.ptask.setUsPeriod(us_period)
+            self.ptask.start(True)
+
+    def moveFailed(self):
+        self.onUnload()
+        self.onMoveFailed()
+
+    def updateMovement(self):
+        import math
+        with self.lock:
+            enableArms = self.getParameter("Arms movement enabled")
+            self.motion.setMoveArmsEnabled(enableArms, enableArms)
+            x = self.getParameter("X")
+            y = self.getParameter("Y")
+            theta = self.getParameter("Theta")
+            period = self.getParameter("Period of direction update (s)")
+            epsilon = 0.0001
+            dx = math.fabs(x - self.x)
+            dy = math.fabs(y - self.y)
+            dt = math.fabs(theta - self.theta)
+
+            # Update moveToward parameters
+            if(dx > epsilon or dy > epsilon or dt > epsilon):
+                self.x=x
+                self.y=y
+                self.theta=theta
+                self.motion.moveToward(self.x, self.y, self.theta)
+
+            # Check if the move has been canceled
+            if (not self.motion.moveIsActive()):
+                self.moveFailed()
+
+            us_period = int(period*1000000)
+            self.ptask.setUsPeriod(us_period)]]>
+</content>
+                            </script>
+                            <Input name="onLoad" type="1" type_size="1" nature="0" inner="1" tooltip="Signal sent when Diagram is loaded." id="1" />
+                            <Input name="onStart" type="1" type_size="1" nature="2" inner="0" tooltip="Box behavior starts when a signal is received on this input." id="2" />
+                            <Input name="onStop" type="1" type_size="1" nature="3" inner="0" tooltip="Box behavior stops when a signal is received on this input." id="3" />
+                            <Output name="onStopped" type="1" type_size="1" nature="1" inner="0" tooltip="Signal sent when the box behavior is stopped." id="4" />
+                            <Output name="onMoveFailed" type="1" type_size="1" nature="1" inner="0" tooltip="Signal sent when the motion move task is canceled." id="5" />
+                            <Parameter name="X" inherits_from_parent="0" content_type="2" value="0.2" default_value="0.2" min="-1" max="1" tooltip="The distance in meters for forward/backward motion. Positive value&#x0A;means forward, negative value means backward." id="6" />
+                            <Parameter name="Y" inherits_from_parent="0" content_type="2" value="0" default_value="0" min="-1" max="1" tooltip="The distance in meters for lateral motion. Positive value means left, negative&#x0A;value means right." id="7" />
+                            <Parameter name="Theta" inherits_from_parent="0" content_type="2" value="1" default_value="0" min="-1" max="1" tooltip="The orientation in radians for final rotation. Positive value means anticlockwise,&#x0A;negative value means clockwise." id="8" />
+                            <Parameter name="Period of direction update (s)" inherits_from_parent="0" content_type="2" value="0.1" default_value="0.1" min="0" max="1" tooltip="" id="9" />
+                            <Parameter name="Arms movement enabled" inherits_from_parent="0" content_type="0" value="1" default_value="1" tooltip="Enables natural motion of the arms." id="10" />
+                            <Resource name="Legs" type="Lock" timeout="0" />
+                        </Box>
+                        <Box name="Be Zombie" id="12" localization="-1" tooltip="This box makes the robot track people with different modes." x="1661" y="545">
+                            <bitmap>media/images/box/interaction/target_face.png</bitmap>
+                            <script language="4">
+                                <content>
+                                    <![CDATA[import time
+
+class MyClass(GeneratedClass):
+    def __init__(self):
+        GeneratedClass.__init__(self)
+        self.tracker = ALProxy( "ALTracker" )
+        self.memory = ALProxy("ALMemory")
+        self.targetName = "People"
+        self.distanceX = 0.0
+        self.distanceY = 0.0
+        self.angleWz = 0.0
+        self.thresholdX = 0.0
+        self.thresholdY = 0.0
+        self.thresholdWz = 0.0
+        self.effector = "None"
+        self.subscribeDone = False
+        self.isRunning = False
+
+    def onLoad(self):
+        self.BIND_PYTHON(self.getName(), "setParameter")
+        self.BIND_PYTHON(self.getName(), "onTargetLost")
+        self.BIND_PYTHON(self.getName(), "onTargetReached")
+        self.BIND_PYTHON(self.getName(), "onTargetChanged")
+        self.memory.subscribeToEvent("ALTracker/ActiveTargetChanged", self.getName(), "onTargetChanged")
+
+    def onUnload(self):
+        if self.subscribeDone:
+            self.memory.unsubscribeToEvent("ALTracker/TargetLost", self.getName())
+            self.memory.unsubscribeToEvent("ALTracker/TargetReached", self.getName())
+            self.subscribeDone = False
+
+        if self.isRunning:
+            self.tracker.setEffector("None")
+            self.tracker.stopTracker()
+            self.tracker.unregisterTarget(self.targetName)
+            self.isRunning = False
+
+    def onInput_onStart(self):
+        self.memory.subscribeToEvent("ALTracker/TargetLost", self.getName(), "onTargetLost")
+        self.memory.subscribeToEvent("ALTracker/TargetReached", self.getName(), "onTargetReached")
+        self.subscribeDone = True
+        mode = self.getParameter("Mode")
+        self.distanceX = self.getParameter("Distance X (m)")
+        self.thresholdX = self.getParameter("Threshold X (m)")
+        self.distanceY = self.getParameter("Distance Y (m)")
+        self.thresholdY = self.getParameter("Threshold Y (m)")
+        self.angleWz = self.getParameter("Theta (rad)")
+        self.thresholdWz = self.getParameter("Threshold Theta (rad)")
+        self.effector = self.getParameter("Effector")
+
+        self.tracker.setEffector(self.effector)
+
+        peopleIds = []
+
+        self.tracker.registerTarget(self.targetName, peopleIds)
+        self.tracker.setRelativePosition([-self.distanceX, self.distanceY, self.angleWz,
+                                           self.thresholdX, self.thresholdY, self.thresholdWz])
+        self.tracker.setMode(mode)
+
+        self.tracker.track(self.targetName) #Start tracker
+        self.isRunning = True
+        #self.motion.moveToward(self.distanceX, self., self.theta)
+
+    def onInput_onStop(self):
+        self.onStopped()
+        self.onUnload()
+
+    def onInput_peopleId(self, p):
+        if(p is None):
+            return
+
+        self.tracker.registerTarget(self.targetName, p)
+
+    def setParameter(self, parameterName, newValue):
+        GeneratedClass.setParameter(self, parameterName, newValue)
+        if (parameterName == 'Mode'):
+            self.tracker.setMode(newValue)
+            return
+
+        if (parameterName == "Distance X (m)"):
+            self.distanceX = newValue
+            self.tracker.setRelativePosition([-self.distanceX, self.distanceY, self.angleWz,
+                                               self.thresholdX, self.thresholdY, self.thresholdWz])
+            return
+
+        if (parameterName == "Distance Y (m)"):
+            self.distanceY = newValue
+            self.tracker.setRelativePosition([-self.distanceX, self.distanceY, self.angleWz,
+                                               self.thresholdX, self.thresholdY, self.thresholdWz])
+            return
+
+        if (parameterName == "Theta (rad)"):
+            self.angleWz = newValue
+            self.tracker.setRelativePosition([-self.distanceX, self.distanceY, self.angleWz,
+                                               self.thresholdX, self.thresholdY, self.thresholdWz])
+            return
+
+        if (parameterName == "Threshold X (m)"):
+            self.thresholdX = newValue
+            self.tracker.setRelativePosition([-self.distanceX, self.distanceY, self.angleWz,
+                                               self.thresholdX, self.thresholdY, self.thresholdWz])
+            return
+
+        if (parameterName == "Threshold Y (m)"):
+            self.thresholdY = newValue
+            self.tracker.setRelativePosition([-self.distanceX, self.distanceY, self.angleWz,
+                                               self.thresholdX, self.thresholdY, self.thresholdWz])
+            return
+
+        if (parameterName == "Threshold Theta (rad)"):
+            self.thresholdWz = newValue
+            self.tracker.setRelativePosition([-self.distanceX, self.distanceY, self.angleWz,
+                                               self.thresholdX, self.thresholdY, self.thresholdWz])
+            return
+
+        if(parameterName == "Effector"):
+            self.tracker.setEffector(newValue)
+            self.effector = newValue
+            return
+
+    def onTargetLost(self, key, value, message):
+        self.targetLost()
+
+    def onTargetReached(self, key, value, message):
+        self.targetReached()
+
+    def onTargetChanged(self, key, value, message):
+        if value == self.targetName and not self.subscribeDone:
+            self.memory.subscribeToEvent("ALTracker/TargetLost", self.getName(), "onTargetLost")
+            self.memory.subscribeToEvent("ALTracker/TargetReached", self.getName(), "onTargetReached")
+            self.subscribeDone = True
+        elif value != self.targetName and self.subscribeDone:
+            self.memory.unsubscribeToEvent("ALTracker/TargetLost", self.getName())
+            self.memory.unsubscribeToEvent("ALTracker/TargetReached", self.getName())
+            self.subscribeDone = False
+
+    def openHands(self):
+        try:
+            hands = []
+            if( self.getParameter("Side") in ["Left", "Both"] ):
+                hands.append( "LHand" )
+            if( self.getParameter("Side") in ["Right", "Both"] ):
+                hands.append( "RHand" )
+            ids = []
+            for hand in hands:
+                if( self.getParameter("Action") == "Open the hand" ):
+                    ids.append( self.motion.post.openHand(hand) )
+                else:
+                    ids.append( self.motion.post.closeHand(hand) )
+            for id in ids:
+                self.motion.wait( id, 0 )
+        finally:
+            self.bIsRunning = False
+            self.onDone() # activate output of the box
+
+    def updateMovement(self):
+        import math
+        with self.lock:
+            enableArms = self.getParameter("Arms movement enabled")
+            self.motion.setMoveArmsEnabled(enableArms, enableArms)
+            #x = self.getParameter("X")
+            x = self.getParameter("Distance X (m)")
+            y = self.getParameter("Y")
+            theta = self.getParameter("Theta")
+            period = self.getParameter("Period of direction update (s)")
+            epsilon = 0.0001
+            dx = math.fabs(x - self.x)
+            dy = math.fabs(y - self.y)
+            dt = math.fabs(theta - self.theta)
+
+            # Update moveToward parameters
+            if(dx > epsilon or dy > epsilon or dt > epsilon):
+                self.x=x
+                self.y=y
+                self.theta=theta
+                self.motion.moveToward(self.x, self.y, self.theta)
+
+            # Check if the move has been canceled
+            if (not self.motion.moveIsActive()):
+                self.moveFailed()
+
+            us_period = int(period*1000000)
+            self.ptask.setUsPeriod(us_period)]]>
+</content>
+                            </script>
+                            <Input name="onLoad" type="1" type_size="1" nature="0" inner="1" tooltip="Signal sent when diagram is loaded." id="1" />
+                            <Input name="onStart" type="1" type_size="1" nature="2" inner="0" tooltip="Box behavior starts when a signal is received on this input." id="2" />
+                            <Input name="onStop" type="1" type_size="1" nature="3" inner="0" tooltip="Box behavior stops when a signal is received on this input." id="3" />
+                            <Input name="peopleId" type="0" type_size="1" nature="1" inner="0" tooltip="List of people id to track" id="4" />
+                            <Output name="onStopped" type="1" type_size="1" nature="1" inner="0" tooltip="Signal sent when box behavior is finished." id="5" />
+                            <Output name="targetLost" type="1" type_size="1" nature="2" inner="0" tooltip="Signal sent when the target is lost." id="6" />
+                            <Output name="targetReached" type="1" type_size="1" nature="2" inner="0" tooltip="Signal sent when the target is reached." id="7" />
+                            <Parameter name="Mode" inherits_from_parent="0" content_type="3" value="WholeBody" default_value="Head" custom_choice="0" tooltip="Set tracker mode" id="8">
+                                <Choice value="Head" />
+                                <Choice value="WholeBody" />
+                                <Choice value="Move" />
+                            </Parameter>
+                            <Parameter name="Effector" inherits_from_parent="0" content_type="3" value="Arms" default_value="None" custom_choice="0" tooltip="Set effector to use for tracking. Head is always used." id="9">
+                                <Choice value="None" />
+                                <Choice value="Arms" />
+                                <Choice value="LArm" />
+                                <Choice value="RArm" />
+                            </Parameter>
+                            <Parameter name="Distance X (m)" inherits_from_parent="0" content_type="2" value="0.399844" default_value="0.3" min="0.01" max="5" tooltip="Distance on X axis the robot will try to maintain from its target in move modes." id="10" />
+                            <Parameter name="Threshold X (m)" inherits_from_parent="0" content_type="2" value="0.01" default_value="0.1" min="0.01" max="1" tooltip="Threshold above which the robot will move to track its target in move modes." id="11" />
+                            <Parameter name="Distance Y (m)" inherits_from_parent="0" content_type="2" value="0" default_value="0" min="-5" max="5" tooltip="Distance on Y axis the robot will try to maintain from its target in move modes." id="12" />
+                            <Parameter name="Threshold Y (m)" inherits_from_parent="0" content_type="2" value="0.1" default_value="0.1" min="0.01" max="1" tooltip="Threshold above which the robot will move to track its target in move modes." id="13" />
+                            <Parameter name="Theta (rad)" inherits_from_parent="0" content_type="2" value="0" default_value="0" min="-3.14" max="3.14" tooltip="Wz angle of the vector robot-target the robot will try to maintain in move modes." id="14" />
+                            <Parameter name="Threshold Theta (rad)" inherits_from_parent="0" content_type="2" value="0.01" default_value="0.3" min="0.01" max="3.14" tooltip="Threshold of the angle of the vector robot-target above which the robot will move to track its target in move modes." id="15" />
+                        </Box>
+                        <Box name="Is Tracker Active" id="15" localization="-1" tooltip='Check if the tracker is active. Output &quot;Yes&quot; is stimulated if tracker is active or output &quot;No&quot; otherwise.' x="872" y="267">
+                            <bitmap>media/images/box/interaction/track.png</bitmap>
+                            <script language="4">
+                                <content>
+                                    <![CDATA[class MyClass(GeneratedClass):
+    def __init__(self):
+        GeneratedClass.__init__(self, False)
+
+    def onLoad(self):
+        self.tracker = ALProxy( "ALTracker" )
+
+    def onUnload(self):
+        pass
+
+    def onInput_onAsk(self):
+        result = self.tracker.isActive()
+        if(result):
+            self.Yes()
+        else:
+            self.No()]]>
+</content>
+                            </script>
+                            <Input name="onLoad" type="1" type_size="1" nature="0" inner="1" tooltip="Signal sent when diagram is loaded." id="1" />
+                            <Input name="onAsk" type="1" type_size="1" nature="1" inner="0" tooltip="When this input is stimulated, the box check if the tracker is active." id="2" />
+                            <Output name="Yes" type="1" type_size="1" nature="2" inner="0" tooltip="Signal sent if the tracker is active." id="3" />
+                            <Output name="No" type="1" type_size="1" nature="2" inner="0" tooltip="Signal sent if the tracker is not active." id="4" />
+                        </Box>
+                        <Box name="Hands" id="1" localization="8" tooltip="the robot stiffens the motors of one or both of his hands so that he can open or close&#x0A;it/them. Then he relaxes the motors of his hand(s)." x="224" y="460">
+                            <bitmap>media/images/box/movement/move_arm.png</bitmap>
+                            <script language="4">
+                                <content>
+                                    <![CDATA[class MyClass(GeneratedClass):
+    def __init__(self):
+        GeneratedClass.__init__(self, False)
+
+    def onLoad(self):
+        self.motion = ALProxy( "ALMotion" )
+        self.bIsRunning = False
+
+    def onUnload(self):
+        self.bIsRunning = False
+
+    def onInput_onStart(self):
+        if( self.bIsRunning ):
+            return
+        self.bIsRunning = True
+        try:
+            hands = []
+            if( self.getParameter("Side") in ["Left", "Both"] ):
+                hands.append( "LHand" )
+            if( self.getParameter("Side") in ["Right", "Both"] ):
+                hands.append( "RHand" )
+            ids = []
+            for hand in hands:
+                if( self.getParameter("Action") == "Open the hand" ):
+                    ids.append( self.motion.post.openHand(hand) )
+                else:
+                    ids.append( self.motion.post.closeHand(hand) )
+            for id in ids:
+                self.motion.wait( id, 0 )
+        finally:
+            self.bIsRunning = False
+            self.onDone() # activate output of the box]]>
+</content>
+                            </script>
+                            <Input name="onLoad" type="1" type_size="1" nature="0" inner="1" tooltip="Signal sent when diagram is loaded." id="1" />
+                            <Input name="onStart" type="1" type_size="1" nature="2" inner="0" tooltip="Box behavior starts when a signal is received on this input." id="2" />
+                            <Output name="onDone" type="1" type_size="1" nature="1" inner="0" tooltip="Signal sent when box behavior is finished." id="3" />
+                            <Parameter name="Side" inherits_from_parent="0" content_type="3" value="Both" default_value="Both" custom_choice="0" tooltip="Choose the hand to move or both of them." id="4">
+                                <Choice value="Both" />
+                                <Choice value="Left" />
+                                <Choice value="Right" />
+                            </Parameter>
+                            <Parameter name="Action" inherits_from_parent="0" content_type="3" value="Open the hand" default_value="Open the hand" custom_choice="0" tooltip="Action you want to make on the robot&apos;s hand." id="5">
+                                <Choice value="Open the hand" />
+                                <Choice value="Close the hand" />
+                            </Parameter>
+                        </Box>
+                        <Box name="Be Zombie" id="2" localization="8" tooltip="Make the robot move in the direction you set in parameters.&#x0A;&#x0A;!!Warning!! the robot will not stop moving by himself. You need to either set x, y and theta to 0 or stop the box to stop him.&#x0A;&#x0A;Note: You can set the period of move direction update in parameters." x="767" y="468">
+                            <bitmap>media/images/box/movement/walk_forward.png</bitmap>
+                            <script language="4">
+                                <content>
+                                    <![CDATA[class MyClass(GeneratedClass):
+
+
+    def __init__(self):
+        GeneratedClass.__init__(self, False)
+
+    def onLoad(self):
+        import threading
+        self.motion = ALProxy("ALMotion")
+        self.x = 0
+        self.y = 0
+        self.theta = 0
+        self.ptask = qi.PeriodicTask()
+        self.lock = threading.RLock()
+
+    def onUnload(self):
+        with self.lock:
+            self.ptask.stop()
+            self.x = 0
+            self.y = 0
+            self.theta = 0
+            self.motion.moveToward(0, 0, 0)
+            self.motion.waitUntilMoveIsFinished()
+
+    def onInput_onStop(self):
+        with self.lock:
+            self.onUnload()
+            self.onStopped()
+
+    def onInput_onStart(self):
+        with self.lock:
+            period = self.getParameter("Period of direction update (s)")
+            us_period = int(period*1000000)
+
+            self.ptask.compensateCallbackTime(True)
+            self.ptask.setCallback(self.updateMovement)
+            self.ptask.setUsPeriod(us_period)
+            self.ptask.start(True)
+
+    def moveFailed(self):
+        self.onUnload()
+        self.onMoveFailed()
+
+    def updateMovement(self):
+        import math
+        with self.lock:
+            enableArms = self.getParameter("Arms movement enabled")
+            self.motion.setMoveArmsEnabled(enableArms, enableArms)
+            x = self.getParameter("X")
+            y = self.getParameter("Y")
+            theta = self.getParameter("Theta")
+            period = self.getParameter("Period of direction update (s)")
+            epsilon = 0.0001
+            dx = math.fabs(x - self.x)
+            dy = math.fabs(y - self.y)
+            dt = math.fabs(theta - self.theta)
+
+            # Update moveToward parameters
+            if(dx > epsilon or dy > epsilon or dt > epsilon):
+                self.x=x
+                self.y=y
+                self.theta=theta
+                self.motion.moveToward(self.x, self.y, self.theta)
+
+            # Check if the move has been canceled
+            if (not self.motion.moveIsActive()):
+                self.moveFailed()
+
+            us_period = int(period*1000000)
+            self.ptask.setUsPeriod(us_period)]]>
+</content>
+                            </script>
+                            <Input name="onLoad" type="1" type_size="1" nature="0" inner="1" tooltip="Signal sent when Diagram is loaded." id="1" />
+                            <Input name="onStart" type="1" type_size="1" nature="2" inner="0" tooltip="Box behavior starts when a signal is received on this input." id="2" />
+                            <Input name="onStop" type="1" type_size="1" nature="3" inner="0" tooltip="Box behavior stops when a signal is received on this input." id="3" />
+                            <Output name="onStopped" type="1" type_size="1" nature="1" inner="0" tooltip="Signal sent when the box behavior is stopped." id="4" />
+                            <Output name="onMoveFailed" type="1" type_size="1" nature="1" inner="0" tooltip="Signal sent when the motion move task is canceled." id="5" />
+                            <Parameter name="X" inherits_from_parent="0" content_type="2" value="0.2" default_value="0.2" min="-1" max="1" tooltip="The distance in meters for forward/backward motion. Positive value&#x0A;means forward, negative value means backward." id="6" />
+                            <Parameter name="Y" inherits_from_parent="0" content_type="2" value="0" default_value="0" min="-1" max="1" tooltip="The distance in meters for lateral motion. Positive value means left, negative&#x0A;value means right." id="7" />
+                            <Parameter name="Theta" inherits_from_parent="0" content_type="2" value="0" default_value="0" min="-1" max="1" tooltip="The orientation in radians for final rotation. Positive value means anticlockwise,&#x0A;negative value means clockwise." id="8" />
+                            <Parameter name="Period of direction update (s)" inherits_from_parent="0" content_type="2" value="0.1" default_value="0.1" min="0" max="1" tooltip="" id="9" />
+                            <Parameter name="Arms movement enabled" inherits_from_parent="0" content_type="0" value="1" default_value="1" tooltip="Enables natural motion of the arms." id="10" />
+                            <Resource name="Legs" type="Lock" timeout="0" />
+                        </Box>
+                        <Box name="Point At" id="10" localization="-1" tooltip="This box makes the robot point to a desired position." x="440" y="619">
+                            <bitmap>media/images/box/movement/move_arm.png</bitmap>
+                            <script language="4">
+                                <content>
+                                    <![CDATA[import time
+
+class MyClass(GeneratedClass):
+    def __init__(self):
+        GeneratedClass.__init__(self)
+        self.tracker = ALProxy( "ALTracker" )
+
+        self.x = 0.0
+        self.y = 0.0
+        self.z = 0.0
+
+        self.maxSpeed = 0.5
+
+        self.effector = "Arms"
+
+        self.frame = 0 #FRAME TORSO
+
+    def onLoad(self):
+        self.BIND_PYTHON(self.getName(), "setParameter")
+
+    def onUnload(self):
+        pass
+
+    def onInput_onStart(self):
+        self.x = self.getParameter("X (m)")
+        self.y = self.getParameter("Y (m)")
+        self.z = self.getParameter("Z (m)")
+
+        self.maxSpeed = self.getParameter("Speed (%)") / 100.0
+        self.effector = self.getParameter("Effector")
+
+        frameStr = self.getParameter("Frame")
+        if frameStr == "Torso":
+            self.frame = 0
+        elif frameStr == "World":
+            self.frame = 1
+        elif frameStr == "Robot":
+            self.frame = 2
+
+        self.tracker.pointAt(self.effector, [self.x, self.y, self.z], self.frame, self.maxSpeed)
+        self.onStopped()
+
+    def onInput_onStop(self):
+        self.onUnload()
+        pass
+
+    def setParameter(self, parameterName, newValue):
+        GeneratedClass.setParameter(self, parameterName, newValue)
+
+        if (parameterName == "X (m)"):
+            self.x = newValue
+            self.tracker.pointAt(self.effector, [self.x, self.y, self.z], self.frame, self.maxSpeed)
+            self.onStopped()
+            return
+
+        if (parameterName == "Y (m)"):
+            self.y = newValue
+            self.tracker.pointAt(self.effector, [self.x, self.y, self.z], self.frame, self.maxSpeed)
+            self.onStopped()
+            return
+
+        if (parameterName == "Z (m)"):
+            self.z = newValue
+            self.tracker.pointAt(self.effector, [self.x, self.y, self.z], self.frame, self.maxSpeed)
+            self.onStopped()
+            return
+
+        if (parameterName == "Speed (%)"):
+            self.maxSpeed = newValue / 100.0
+            return
+
+        if (parameterName == "Effector"):
+            self.effector = newValue
+            self.tracker.pointAt(self.effector, [self.x, self.y, self.z], self.frame, self.maxSpeed)
+            self.onStopped()
+            return
+
+        if (parameterName == "Frame"):
+            if(newValue == "Torso"):
+                self.frame = 0
+            elif newValue == "World":
+                self.frame = 1
+            elif newValue == "Robot":
+                self.frame = 2]]>
+</content>
+                            </script>
+                            <Input name="onLoad" type="1" type_size="1" nature="0" inner="1" tooltip="Signal sent when diagram is loaded." id="1" />
+                            <Input name="onStart" type="1" type_size="1" nature="2" inner="0" tooltip="Box behavior starts when a signal is received on this input." id="2" />
+                            <Input name="onStop" type="1" type_size="1" nature="3" inner="0" tooltip="Box behavior stops when a signal is received on this input." id="3" />
+                            <Output name="onStopped" type="1" type_size="1" nature="1" inner="0" tooltip="Signal sent when box behavior is finished." id="4" />
+                            <Parameter name="X (m)" inherits_from_parent="0" content_type="2" value="1" default_value="1" min="0.001" max="10" tooltip="X coordinate of the target to point at." id="5" />
+                            <Parameter name="Y (m)" inherits_from_parent="0" content_type="2" value="0" default_value="0" min="-10" max="10" tooltip="Y coordinate of the target to point at." id="6" />
+                            <Parameter name="Z (m)" inherits_from_parent="0" content_type="2" value="0" default_value="0" min="-10" max="10" tooltip="Z coordinate of the target to point at." id="7" />
+                            <Parameter name="Speed (%)" inherits_from_parent="0" content_type="1" value="50" default_value="50" min="1" max="100" tooltip="Speed to look at the desired position" id="8" />
+                            <Parameter name="Effector" inherits_from_parent="0" content_type="3" value="Arms" default_value="Arms" custom_choice="0" tooltip="Effector to use" id="9">
+                                <Choice value="Arms" />
+                                <Choice value="LArm" />
+                                <Choice value="RArm" />
+                            </Parameter>
+                            <Parameter name="Frame" inherits_from_parent="0" content_type="3" value="Torso" default_value="Torso" custom_choice="0" tooltip="Select the frame of target." id="10">
+                                <Choice value="Torso" />
+                                <Choice value="World" />
+                                <Choice value="Robot" />
+                            </Parameter>
+                        </Box>
+                        <Box name="People Tracker" id="3" localization="-1" tooltip="This box makes the robot track people with different modes." x="1671" y="441">
+                            <bitmap>media/images/box/interaction/target_face.png</bitmap>
+                            <script language="4">
+                                <content>
+                                    <![CDATA[import time
+
+class MyClass(GeneratedClass):
+    def __init__(self):
+        GeneratedClass.__init__(self)
+        self.tracker = ALProxy( "ALTracker" )
+        self.memory = ALProxy("ALMemory")
+        self.targetName = "People"
+        self.distanceX = 0.0
+        self.distanceY = 0.0
+        self.angleWz = 0.0
+        self.thresholdX = 0.0
+        self.thresholdY = 0.0
+        self.thresholdWz = 0.0
+        self.effector = "None"
+        self.subscribeDone = False
+        self.isRunning = False
+
+    def onLoad(self):
+        self.BIND_PYTHON(self.getName(), "setParameter")
+        self.BIND_PYTHON(self.getName(), "onTargetLost")
+        self.BIND_PYTHON(self.getName(), "onTargetReached")
+        self.BIND_PYTHON(self.getName(), "onTargetChanged")
+        self.memory.subscribeToEvent("ALTracker/ActiveTargetChanged", self.getName(), "onTargetChanged")
+        #start-move code
+        import threading
+        self.motion = ALProxy("ALMotion")
+        self.x = 0
+        self.y = 0
+        self.theta = 0
+        self.ptask = qi.PeriodicTask()
+        self.lock = threading.RLock()
+        #end-move code
+
+    def onUnload(self):
+        #start-move code
+        with self.lock:
+            self.ptask.stop()
+            self.x = 0
+            self.y = 0
+            self.theta = 0
+            self.motion.moveToward(0, 0, 0)
+            self.motion.waitUntilMoveIsFinished()
+        #end-move code
+        if self.subscribeDone:
+            self.memory.unsubscribeToEvent("ALTracker/TargetLost", self.getName())
+            self.memory.unsubscribeToEvent("ALTracker/TargetReached", self.getName())
+            self.subscribeDone = False
+
+        if self.isRunning:
+            self.tracker.setEffector("None")
+            self.tracker.stopTracker()
+            self.tracker.unregisterTarget(self.targetName)
+            self.isRunning = False
+
+    #start-move code
+    def onInput_onStop(self):
+        with self.lock:
+            self.onUnload()
+            self.onStopped()
+
+    def moveFailed(self):
+        self.onUnload()
+        self.onMoveFailed()
+
+    def updateMovement(self):
+        import math
+        with self.lock:
+            enableArms = self.getParameter("Arms movement enabled")
+            self.motion.setMoveArmsEnabled(enableArms, enableArms)
+            x = self.getParameter("X")
+            y = self.getParameter("Y")
+            theta = self.getParameter("Theta")
+            period = self.getParameter("Period of direction update (s)")
+            epsilon = 0.0001
+            dx = math.fabs(x - self.x)
+            dy = math.fabs(y - self.y)
+            dt = math.fabs(theta - self.theta)
+
+            # Update moveToward parameters
+            if(dx > epsilon or dy > epsilon or dt > epsilon):
+                self.x=x
+                self.y=y
+                self.theta=theta
+                self.motion.moveToward(self.x, self.y, self.theta)
+
+            # Check if the move has been canceled
+            if (not self.motion.moveIsActive()):
+                self.moveFailed()
+
+            us_period = int(period*1000000)
+            self.ptask.setUsPeriod(us_period)
+    #end-move code
+
+    def onInput_onStart(self):
+        self.memory.subscribeToEvent("ALTracker/TargetLost", self.getName(), "onTargetLost")
+        self.memory.subscribeToEvent("ALTracker/TargetReached", self.getName(), "onTargetReached")
+        self.subscribeDone = True
+
+        mode = self.getParameter("Mode")
+        self.distanceX = self.getParameter("Distance X (m)")
+        self.thresholdX = self.getParameter("Threshold X (m)")
+        self.distanceY = self.getParameter("Distance Y (m)")
+        self.thresholdY = self.getParameter("Threshold Y (m)")
+        self.angleWz = self.getParameter("Theta (rad)")
+        self.thresholdWz = self.getParameter("Threshold Theta (rad)")
+        self.effector = self.getParameter("Effector")
+
+        self.tracker.setEffector(self.effector)
+
+        peopleIds = []
+
+        self.tracker.registerTarget(self.targetName, peopleIds)
+        self.tracker.setRelativePosition([-self.distanceX, self.distanceY, self.angleWz,
+                                           self.thresholdX, self.thresholdY, self.thresholdWz])
+        self.tracker.setMode(mode)
+
+        self.tracker.track(self.targetName) #Start tracker
+        self.isRunning = True
+
+    def onInput_onStop(self):
+        self.onStopped()
+        self.onUnload()
+
+    def onInput_peopleId(self, p):
+        if(p is None):
+            return
+
+        self.tracker.registerTarget(self.targetName, p)
+
+    def setParameter(self, parameterName, newValue):
+        GeneratedClass.setParameter(self, parameterName, newValue)
+        if (parameterName == 'Mode'):
+            self.tracker.setMode(newValue)
+            return
+
+        if (parameterName == "Distance X (m)"):
+            self.distanceX = newValue
+            self.tracker.setRelativePosition([-self.distanceX, self.distanceY, self.angleWz,
+                                               self.thresholdX, self.thresholdY, self.thresholdWz])
+            return
+
+        if (parameterName == "Distance Y (m)"):
+            self.distanceY = newValue
+            self.tracker.setRelativePosition([-self.distanceX, self.distanceY, self.angleWz,
+                                               self.thresholdX, self.thresholdY, self.thresholdWz])
+            return
+
+        if (parameterName == "Theta (rad)"):
+            self.angleWz = newValue
+            self.tracker.setRelativePosition([-self.distanceX, self.distanceY, self.angleWz,
+                                               self.thresholdX, self.thresholdY, self.thresholdWz])
+            return
+
+        if (parameterName == "Threshold X (m)"):
+            self.thresholdX = newValue
+            self.tracker.setRelativePosition([-self.distanceX, self.distanceY, self.angleWz,
+                                               self.thresholdX, self.thresholdY, self.thresholdWz])
+            return
+
+        if (parameterName == "Threshold Y (m)"):
+            self.thresholdY = newValue
+            self.tracker.setRelativePosition([-self.distanceX, self.distanceY, self.angleWz,
+                                               self.thresholdX, self.thresholdY, self.thresholdWz])
+            return
+
+        if (parameterName == "Threshold Theta (rad)"):
+            self.thresholdWz = newValue
+            self.tracker.setRelativePosition([-self.distanceX, self.distanceY, self.angleWz,
+                                               self.thresholdX, self.thresholdY, self.thresholdWz])
+            return
+
+        if(parameterName == "Effector"):
+            self.tracker.setEffector(newValue)
+            self.effector = newValue
+            return
+
+    def onTargetLost(self, key, value, message):
+        self.targetLost()
+
+    def onTargetReached(self, key, value, message):
+        self.targetReached()
+
+    def onTargetChanged(self, key, value, message):
+        if value == self.targetName and not self.subscribeDone:
+            self.memory.subscribeToEvent("ALTracker/TargetLost", self.getName(), "onTargetLost")
+            self.memory.subscribeToEvent("ALTracker/TargetReached", self.getName(), "onTargetReached")
+            self.subscribeDone = True
+        elif value != self.targetName and self.subscribeDone:
+            self.memory.unsubscribeToEvent("ALTracker/TargetLost", self.getName())
+            self.memory.unsubscribeToEvent("ALTracker/TargetReached", self.getName())
+            self.subscribeDone = False]]>
+</content>
+                            </script>
+                            <Input name="onLoad" type="1" type_size="1" nature="0" inner="1" tooltip="Signal sent when diagram is loaded." id="1" />
+                            <Input name="onStart" type="1" type_size="1" nature="2" inner="0" tooltip="Box behavior starts when a signal is received on this input." id="2" />
+                            <Input name="onStop" type="1" type_size="1" nature="3" inner="0" tooltip="Box behavior stops when a signal is received on this input." id="3" />
+                            <Input name="peopleId" type="0" type_size="1" nature="1" inner="0" tooltip="List of people id to track" id="4" />
+                            <Output name="onStopped" type="1" type_size="1" nature="1" inner="0" tooltip="Signal sent when box behavior is finished." id="5" />
+                            <Output name="targetLost" type="1" type_size="1" nature="2" inner="0" tooltip="Signal sent when the target is lost." id="6" />
+                            <Output name="targetReached" type="1" type_size="1" nature="2" inner="0" tooltip="Signal sent when the target is reached." id="7" />
+                            <Parameter name="Mode" inherits_from_parent="0" content_type="3" value="Move" default_value="Head" custom_choice="0" tooltip="Set tracker mode" id="8">
+                                <Choice value="Head" />
+                                <Choice value="WholeBody" />
+                                <Choice value="Move" />
+                            </Parameter>
+                            <Parameter name="Effector" inherits_from_parent="0" content_type="3" value="Arms" default_value="None" custom_choice="0" tooltip="Set effector to use for tracking. Head is always used." id="9">
+                                <Choice value="None" />
+                                <Choice value="Arms" />
+                                <Choice value="LArm" />
+                                <Choice value="RArm" />
+                            </Parameter>
+                            <Parameter name="Distance X (m)" inherits_from_parent="0" content_type="2" value="0.3" default_value="0.3" min="0.01" max="5" tooltip="Distance on X axis the robot will try to maintain from its target in move modes." id="10" />
+                            <Parameter name="Threshold X (m)" inherits_from_parent="0" content_type="2" value="0.1" default_value="0.1" min="0.01" max="1" tooltip="Threshold above which the robot will move to track its target in move modes." id="11" />
+                            <Parameter name="Distance Y (m)" inherits_from_parent="0" content_type="2" value="0" default_value="0" min="-5" max="5" tooltip="Distance on Y axis the robot will try to maintain from its target in move modes." id="12" />
+                            <Parameter name="Threshold Y (m)" inherits_from_parent="0" content_type="2" value="0.1" default_value="0.1" min="0.01" max="1" tooltip="Threshold above which the robot will move to track its target in move modes." id="13" />
+                            <Parameter name="Theta (rad)" inherits_from_parent="0" content_type="2" value="0" default_value="0" min="-3.14" max="3.14" tooltip="Wz angle of the vector robot-target the robot will try to maintain in move modes." id="14" />
+                            <Parameter name="Threshold Theta (rad)" inherits_from_parent="0" content_type="2" value="0.3" default_value="0.3" min="0.01" max="3.14" tooltip="Threshold of the angle of the vector robot-target above which the robot will move to track its target in move modes." id="15" />
+                            <Parameter name="x" inherits_from_parent="1" content_type="2" value="0.1" default_value="0.1" min="-1" max="1" tooltip="" id="16" />
+                            <Resource name="Legs" type="Lock" timeout="0" />
+                        </Box>
+                        <Box name="People Tracker (1)" id="4" localization="-1" tooltip="This box makes the robot track people with different modes." x="1374" y="602">
+                            <bitmap>media/images/box/interaction/target_face.png</bitmap>
+                            <script language="4">
+                                <content>
+                                    <![CDATA[import time
+
+class MyClass(GeneratedClass):
+    def __init__(self):
+        GeneratedClass.__init__(self)
+        self.tracker = ALProxy( "ALTracker" )
+        self.memory = ALProxy("ALMemory")
+        self.targetName = "People"
+        self.distanceX = 0.0
+        self.distanceY = 0.0
+        self.angleWz = 0.0
+        self.thresholdX = 0.0
+        self.thresholdY = 0.0
+        self.thresholdWz = 0.0
+        self.effector = "None"
+        self.subscribeDone = False
+        self.isRunning = False
+
+    def onLoad(self):
+        print "line 20"
+        self.BIND_PYTHON(self.getName(), "setParameter")
+        self.BIND_PYTHON(self.getName(), "onTargetLost")
+        self.BIND_PYTHON(self.getName(), "onTargetReached")
+        self.BIND_PYTHON(self.getName(), "onTargetChanged")
+        self.memory.subscribeToEvent("ALTracker/ActiveTargetChanged", self.getName(), "onTargetChanged")
+        #start-move code
+        import threading
+        self.motion = ALProxy("ALMotion")
+        self.x = 0
+        self.y = 0
+        self.theta = 0
+        self.ptask = qi.PeriodicTask()
+        self.lock = threading.RLock()
+        #end-move code
+
+    def onUnload(self):
+        #start-move code
+        with self.lock:
+            self.ptask.stop()
+            self.x = 0
+            self.y = 0
+            self.theta = 0
+            self.motion.moveToward(0, 0, 0)
+            self.motion.waitUntilMoveIsFinished()
+        #end-move code
+        if self.subscribeDone:
+            self.memory.unsubscribeToEvent("ALTracker/TargetLost", self.getName())
+            self.memory.unsubscribeToEvent("ALTracker/TargetReached", self.getName())
+            self.subscribeDone = False
+
+        if self.isRunning:
+            self.tracker.setEffector("None")
+            self.tracker.stopTracker()
+            self.tracker.unregisterTarget(self.targetName)
+            self.isRunning = False
+
+    #start-move code
+    def onInput_onStop(self):
+        with self.lock:
+            self.onUnload()
+            self.onStopped()
+
+    def moveFailed(self):
+        self.onUnload()
+        self.onMoveFailed()
+
+    def updateMovement(self):
+        import math
+        with self.lock:
+            enableArms = self.getParameter("Arms movement enabled")
+            self.motion.setMoveArmsEnabled(enableArms, enableArms)
+            #x = self.getParameter("X")
+            #start-new code added
+            x = 1
+            #end-new code added
+            y = self.getParameter("Y")
+            theta = self.getParameter("Theta")
+            period = self.getParameter("Period of direction update (s)")
+            epsilon = 0.0001
+            #dx = math.fabs(x - self.x)
+            #dy = math.fabs(y - self.y)
+            #dt = math.fabs(theta - self.theta)
+            #start-new code added
+            dx = 1
+            dy = 0
+            dt = math.fabs(theta - self.theta)
+            #end-new code added
+
+            # Update moveToward parameters
+            if(dx > epsilon or dy > epsilon or dt > epsilon):
+                self.x=x
+                self.y=y
+                self.theta=theta
+                self.motion.moveToward(self.x, self.y, self.theta)
+
+            # Check if the move has been canceled
+            if (not self.motion.moveIsActive()):
+                self.moveFailed()
+
+            us_period = int(period*1000000)
+            self.ptask.setUsPeriod(us_period)
+    #end-move code
+
+    def onInput_onStart(self):
+        self.memory.subscribeToEvent("ALTracker/TargetLost", self.getName(), "onTargetLost")
+        self.memory.subscribeToEvent("ALTracker/TargetReached", self.getName(), "onTargetReached")
+        self.subscribeDone = True
+
+        mode = self.getParameter("Mode")
+        self.distanceX = self.getParameter("Distance X (m)")
+        self.thresholdX = self.getParameter("Threshold X (m)")
+        self.distanceY = self.getParameter("Distance Y (m)")
+        self.thresholdY = self.getParameter("Threshold Y (m)")
+        self.angleWz = self.getParameter("Theta (rad)")
+        self.thresholdWz = self.getParameter("Threshold Theta (rad)")
+        self.effector = self.getParameter("Effector")
+
+        self.tracker.setEffector(self.effector)
+
+        peopleIds = []
+
+        self.tracker.registerTarget(self.targetName, peopleIds)
+        self.tracker.setRelativePosition([-self.distanceX, self.distanceY, self.angleWz,
+                                           self.thresholdX, self.thresholdY, self.thresholdWz])
+        self.tracker.setMode(mode)
+
+        self.tracker.track(self.targetName) #Start tracker
+        self.isRunning = True
+        #start-move code
+        with self.lock:
+            #period = self.getParameter("Period of direction update (s)")
+            #us_period = int(period*1000000)
+            us_period = int(1000000)
+            self.ptask.compensateCallbackTime(True)
+            self.ptask.setCallback(self.updateMovement)
+            self.ptask.setUsPeriod(us_period)
+            self.ptask.start(True)
+        #end-move code
+
+    def onInput_onStop(self):
+        self.onStopped()
+        self.onUnload()
+
+    def onInput_peopleId(self, p):
+        if(p is None):
+            return
+
+        self.tracker.registerTarget(self.targetName, p)
+
+    def setParameter(self, parameterName, newValue):
+        GeneratedClass.setParameter(self, parameterName, newValue)
+        if (parameterName == 'Mode'):
+            self.tracker.setMode(newValue)
+            return
+
+        if (parameterName == "Distance X (m)"):
+            self.distanceX = newValue
+            self.tracker.setRelativePosition([-self.distanceX, self.distanceY, self.angleWz,
+                                               self.thresholdX, self.thresholdY, self.thresholdWz])
+            return
+
+        if (parameterName == "Distance Y (m)"):
+            self.distanceY = newValue
+            self.tracker.setRelativePosition([-self.distanceX, self.distanceY, self.angleWz,
+                                               self.thresholdX, self.thresholdY, self.thresholdWz])
+            return
+
+        if (parameterName == "Theta (rad)"):
+            self.angleWz = newValue
+            self.tracker.setRelativePosition([-self.distanceX, self.distanceY, self.angleWz,
+                                               self.thresholdX, self.thresholdY, self.thresholdWz])
+            return
+
+        if (parameterName == "Threshold X (m)"):
+            self.thresholdX = newValue
+            self.tracker.setRelativePosition([-self.distanceX, self.distanceY, self.angleWz,
+                                               self.thresholdX, self.thresholdY, self.thresholdWz])
+            return
+
+        if (parameterName == "Threshold Y (m)"):
+            self.thresholdY = newValue
+            self.tracker.setRelativePosition([-self.distanceX, self.distanceY, self.angleWz,
+                                               self.thresholdX, self.thresholdY, self.thresholdWz])
+            return
+
+        if (parameterName == "Threshold Theta (rad)"):
+            self.thresholdWz = newValue
+            self.tracker.setRelativePosition([-self.distanceX, self.distanceY, self.angleWz,
+                                               self.thresholdX, self.thresholdY, self.thresholdWz])
+            return
+
+        if(parameterName == "Effector"):
+            self.tracker.setEffector(newValue)
+            self.effector = newValue
+            return
+
+    def onTargetLost(self, key, value, message):
+        self.targetLost()
+
+    def onTargetReached(self, key, value, message):
+        self.targetReached()
+
+    def onTargetChanged(self, key, value, message):
+        if value == self.targetName and not self.subscribeDone:
+            self.memory.subscribeToEvent("ALTracker/TargetLost", self.getName(), "onTargetLost")
+            self.memory.subscribeToEvent("ALTracker/TargetReached", self.getName(), "onTargetReached")
+            self.subscribeDone = True
+        elif value != self.targetName and self.subscribeDone:
+            self.memory.unsubscribeToEvent("ALTracker/TargetLost", self.getName())
+            self.memory.unsubscribeToEvent("ALTracker/TargetReached", self.getName())
+            self.subscribeDone = False]]>
+</content>
+                            </script>
+                            <Input name="onLoad" type="1" type_size="1" nature="0" inner="1" tooltip="Signal sent when diagram is loaded." id="1" />
+                            <Input name="onStart" type="1" type_size="1" nature="2" inner="0" tooltip="Box behavior starts when a signal is received on this input." id="2" />
+                            <Input name="onStop" type="1" type_size="1" nature="3" inner="0" tooltip="Box behavior stops when a signal is received on this input." id="3" />
+                            <Input name="peopleId" type="0" type_size="1" nature="1" inner="0" tooltip="List of people id to track" id="4" />
+                            <Output name="onStopped" type="1" type_size="1" nature="1" inner="0" tooltip="Signal sent when box behavior is finished." id="5" />
+                            <Output name="targetLost" type="1" type_size="1" nature="2" inner="0" tooltip="Signal sent when the target is lost." id="6" />
+                            <Output name="targetReached" type="1" type_size="1" nature="2" inner="0" tooltip="Signal sent when the target is reached." id="7" />
+                            <Parameter name="Mode" inherits_from_parent="0" content_type="3" value="Move" default_value="Head" custom_choice="0" tooltip="Set tracker mode" id="8">
+                                <Choice value="Head" />
+                                <Choice value="WholeBody" />
+                                <Choice value="Move" />
+                            </Parameter>
+                            <Parameter name="Effector" inherits_from_parent="0" content_type="3" value="Arms" default_value="None" custom_choice="0" tooltip="Set effector to use for tracking. Head is always used." id="9">
+                                <Choice value="None" />
+                                <Choice value="Arms" />
+                                <Choice value="LArm" />
+                                <Choice value="RArm" />
+                            </Parameter>
+                            <Parameter name="Distance X (m)" inherits_from_parent="0" content_type="2" value="0.3" default_value="0.3" min="0.01" max="5" tooltip="Distance on X axis the robot will try to maintain from its target in move modes." id="10" />
+                            <Parameter name="Threshold X (m)" inherits_from_parent="0" content_type="2" value="0.1" default_value="0.1" min="0.01" max="1" tooltip="Threshold above which the robot will move to track its target in move modes." id="11" />
+                            <Parameter name="Distance Y (m)" inherits_from_parent="0" content_type="2" value="0" default_value="0" min="-5" max="5" tooltip="Distance on Y axis the robot will try to maintain from its target in move modes." id="12" />
+                            <Parameter name="Threshold Y (m)" inherits_from_parent="0" content_type="2" value="0.1" default_value="0.1" min="0.01" max="1" tooltip="Threshold above which the robot will move to track its target in move modes." id="13" />
+                            <Parameter name="Theta (rad)" inherits_from_parent="0" content_type="2" value="0" default_value="0" min="-3.14" max="3.14" tooltip="Wz angle of the vector robot-target the robot will try to maintain in move modes." id="14" />
+                            <Parameter name="Threshold Theta (rad)" inherits_from_parent="0" content_type="2" value="0.3" default_value="0.3" min="0.01" max="3.14" tooltip="Threshold of the angle of the vector robot-target above which the robot will move to track its target in move modes." id="15" />
+                            <Parameter name="x" inherits_from_parent="1" content_type="2" value="0.1" default_value="0.1" min="-1" max="1" tooltip="" id="16" />
+                            <Resource name="Legs" type="Lock" timeout="0" />
+                        </Box>
+                        <Box name="Zombie20160603Fri1616" id="5" localization="-1" tooltip="This box makes the robot track people with different modes." x="1088" y="114">
+                            <bitmap>media/images/box/interaction/target_face.png</bitmap>
+                            <script language="4">
+                                <content>
+                                    <![CDATA[import time
+
+class MyClass(GeneratedClass):
+    def __init__(self):
+        GeneratedClass.__init__(self)
+        self.tracker = ALProxy( "ALTracker" )
+        self.memory = ALProxy("ALMemory")
+        self.targetName = "People"
+        self.distanceX = 0.0
+        self.distanceY = 0.0
+        self.angleWz = 0.0
+        self.thresholdX = 0.0
+        self.thresholdY = 0.0
+        self.thresholdWz = 0.0
+        self.effector = "None"
+        self.subscribeDone = False
+        self.isRunning = False
+
+    def onLoad(self):
+        #start - move code
+        import threading
+        self.motion = ALProxy("ALMotion")
+        self.x = 0
+        self.y = 0
+        self.theta = 0
+        self.ptask = qi.PeriodicTask()
+        self.lock = threading.RLock()
+        #end - move code
+        self.BIND_PYTHON(self.getName(), "setParameter")
+        self.BIND_PYTHON(self.getName(), "onTargetLost")
+        self.BIND_PYTHON(self.getName(), "onTargetReached")
+        self.BIND_PYTHON(self.getName(), "onTargetChanged")
+        self.memory.subscribeToEvent("ALTracker/ActiveTargetChanged", self.getName(), "onTargetChanged")
+
+    def onUnload(self):
+        if self.subscribeDone:
+            self.memory.unsubscribeToEvent("ALTracker/TargetLost", self.getName())
+            self.memory.unsubscribeToEvent("ALTracker/TargetReached", self.getName())
+            self.subscribeDone = False
+
+        if self.isRunning:
+            self.tracker.setEffector("None")
+            self.tracker.stopTracker()
+            self.tracker.unregisterTarget(self.targetName)
+            self.isRunning = False
+
+    def onInput_onStart(self):
+        self.memory.subscribeToEvent("ALTracker/TargetLost", self.getName(), "onTargetLost")
+        self.memory.subscribeToEvent("ALTracker/TargetReached", self.getName(), "onTargetReached")
+        self.subscribeDone = True
+
+        mode = self.getParameter("Mode")
+        self.distanceX = self.getParameter("Distance X (m)")
+        self.thresholdX = self.getParameter("Threshold X (m)")
+        self.distanceY = self.getParameter("Distance Y (m)")
+        self.thresholdY = self.getParameter("Threshold Y (m)")
+        self.angleWz = self.getParameter("Theta (rad)")
+        self.thresholdWz = self.getParameter("Threshold Theta (rad)")
+        self.effector = self.getParameter("Effector")
+
+        self.tracker.setEffector(self.effector)
+
+        peopleIds = []
+
+        self.tracker.registerTarget(self.targetName, peopleIds)
+        self.tracker.setRelativePosition([-self.distanceX, self.distanceY, self.angleWz,
+                                           self.thresholdX, self.thresholdY, self.thresholdWz])
+        self.tracker.setMode(mode)
+
+        self.tracker.track(self.targetName) #Start tracker
+        self.isRunning = True
+
+    def onInput_onStop(self):
+        self.onStopped()
+        self.onUnload()
+
+    def onInput_peopleId(self, p):
+        if(p is None):
+            return
+
+        self.tracker.registerTarget(self.targetName, p)
+
+    def setParameter(self, parameterName, newValue):
+        GeneratedClass.setParameter(self, parameterName, newValue)
+        if (parameterName == 'Mode'):
+            self.tracker.setMode(newValue)
+            return
+
+        if (parameterName == "Distance X (m)"):
+            self.distanceX = newValue
+            self.tracker.setRelativePosition([-self.distanceX, self.distanceY, self.angleWz,
+                                               self.thresholdX, self.thresholdY, self.thresholdWz])
+            return
+
+        if (parameterName == "Distance Y (m)"):
+            self.distanceY = newValue
+            self.tracker.setRelativePosition([-self.distanceX, self.distanceY, self.angleWz,
+                                               self.thresholdX, self.thresholdY, self.thresholdWz])
+            return
+
+        if (parameterName == "Theta (rad)"):
+            self.angleWz = newValue
+            self.tracker.setRelativePosition([-self.distanceX, self.distanceY, self.angleWz,
+                                               self.thresholdX, self.thresholdY, self.thresholdWz])
+            return
+
+        if (parameterName == "Threshold X (m)"):
+            self.thresholdX = newValue
+            self.tracker.setRelativePosition([-self.distanceX, self.distanceY, self.angleWz,
+                                               self.thresholdX, self.thresholdY, self.thresholdWz])
+            return
+
+        if (parameterName == "Threshold Y (m)"):
+            self.thresholdY = newValue
+            self.tracker.setRelativePosition([-self.distanceX, self.distanceY, self.angleWz,
+                                               self.thresholdX, self.thresholdY, self.thresholdWz])
+            return
+
+        if (parameterName == "Threshold Theta (rad)"):
+            self.thresholdWz = newValue
+            self.tracker.setRelativePosition([-self.distanceX, self.distanceY, self.angleWz,
+                                               self.thresholdX, self.thresholdY, self.thresholdWz])
+            return
+
+        if(parameterName == "Effector"):
+            self.tracker.setEffector(newValue)
+            self.effector = newValue
+            return
+
+    def onTargetLost(self, key, value, message):
+        self.targetLost()
+
+    def onTargetReached(self, key, value, message):
+        self.targetReached()
+
+    def onTargetChanged(self, key, value, message):
+        if value == self.targetName and not self.subscribeDone:
+            self.memory.subscribeToEvent("ALTracker/TargetLost", self.getName(), "onTargetLost")
+            self.memory.subscribeToEvent("ALTracker/TargetReached", self.getName(), "onTargetReached")
+            self.subscribeDone = True
+        elif value != self.targetName and self.subscribeDone:
+            self.memory.unsubscribeToEvent("ALTracker/TargetLost", self.getName())
+            self.memory.unsubscribeToEvent("ALTracker/TargetReached", self.getName())
+            self.subscribeDone = False]]>
+</content>
+                            </script>
+                            <Input name="onLoad" type="1" type_size="1" nature="0" inner="1" tooltip="Signal sent when diagram is loaded." id="1" />
+                            <Input name="onStart" type="1" type_size="1" nature="2" inner="0" tooltip="Box behavior starts when a signal is received on this input." id="2" />
+                            <Input name="onStop" type="1" type_size="1" nature="3" inner="0" tooltip="Box behavior stops when a signal is received on this input." id="3" />
+                            <Input name="peopleId" type="0" type_size="1" nature="1" inner="0" tooltip="List of people id to track" id="4" />
+                            <Output name="onStopped" type="1" type_size="1" nature="1" inner="0" tooltip="Signal sent when box behavior is finished." id="5" />
+                            <Output name="targetLost" type="1" type_size="1" nature="2" inner="0" tooltip="Signal sent when the target is lost." id="6" />
+                            <Output name="targetReached" type="1" type_size="1" nature="2" inner="0" tooltip="Signal sent when the target is reached." id="7" />
+                            <Parameter name="Mode" inherits_from_parent="0" content_type="3" value="WholeBody" default_value="Head" custom_choice="0" tooltip="Set tracker mode" id="8">
+                                <Choice value="Head" />
+                                <Choice value="WholeBody" />
+                                <Choice value="Move" />
+                            </Parameter>
+                            <Parameter name="Effector" inherits_from_parent="0" content_type="3" value="Arms" default_value="None" custom_choice="0" tooltip="Set effector to use for tracking. Head is always used." id="9">
+                                <Choice value="None" />
+                                <Choice value="Arms" />
+                                <Choice value="LArm" />
+                                <Choice value="RArm" />
+                            </Parameter>
+                            <Parameter name="Distance X (m)" inherits_from_parent="0" content_type="2" value="0.711719" default_value="0.3" min="0.01" max="5" tooltip="Distance on X axis the robot will try to maintain from its target in move modes." id="10" />
+                            <Parameter name="Threshold X (m)" inherits_from_parent="0" content_type="2" value="0.1" default_value="0.1" min="0.01" max="1" tooltip="Threshold above which the robot will move to track its target in move modes." id="11" />
+                            <Parameter name="Distance Y (m)" inherits_from_parent="0" content_type="2" value="0" default_value="0" min="-5" max="5" tooltip="Distance on Y axis the robot will try to maintain from its target in move modes." id="12" />
+                            <Parameter name="Threshold Y (m)" inherits_from_parent="0" content_type="2" value="0.1" default_value="0.1" min="0.01" max="1" tooltip="Threshold above which the robot will move to track its target in move modes." id="13" />
+                            <Parameter name="Theta (rad)" inherits_from_parent="0" content_type="2" value="0" default_value="0" min="-3.14" max="3.14" tooltip="Wz angle of the vector robot-target the robot will try to maintain in move modes." id="14" />
+                            <Parameter name="Threshold Theta (rad)" inherits_from_parent="0" content_type="2" value="0.3" default_value="0.3" min="0.01" max="3.14" tooltip="Threshold of the angle of the vector robot-target above which the robot will move to track its target in move modes." id="15" />
+                        </Box>
+                        <Box name="Zombie20160603Fri1617" id="6" localization="-1" tooltip="This box makes the robot track people with different modes." x="1089" y="216">
+                            <bitmap>media/images/box/interaction/target_face.png</bitmap>
+                            <script language="4">
+                                <content>
+                                    <![CDATA[import time
+
+class MyClass(GeneratedClass):
+    def __init__(self):
+        GeneratedClass.__init__(self)
+        self.tracker = ALProxy( "ALTracker" )
+        self.memory = ALProxy("ALMemory")
+        self.targetName = "People"
+        self.distanceX = 0.0
+        self.distanceY = 0.0
+        self.angleWz = 0.0
+        self.thresholdX = 0.0
+        self.thresholdY = 0.0
+        self.thresholdWz = 0.0
+        self.effector = "None"
+        self.subscribeDone = False
+        self.isRunning = False
+
+    def onLoad(self):
+        #start - move code
+        import threading
+        self.motion = ALProxy("ALMotion")
+        self.x = 0
+        self.y = 0
+        self.theta = 0
+        self.ptask = qi.PeriodicTask()
+        self.lock = threading.RLock()
+        #end - move code
+        self.BIND_PYTHON(self.getName(), "setParameter")
+        self.BIND_PYTHON(self.getName(), "onTargetLost")
+        self.BIND_PYTHON(self.getName(), "onTargetReached")
+        self.BIND_PYTHON(self.getName(), "onTargetChanged")
+        self.memory.subscribeToEvent("ALTracker/ActiveTargetChanged", self.getName(), "onTargetChanged")
+
+    def onUnload(self):
+        #start - move code
+        with self.lock:
+            self.ptask.stop()
+            self.x = 0
+            self.y = 0
+            self.theta = 0
+            self.motion.moveToward(0, 0, 0)
+            self.motion.waitUntilMoveIsFinished()
+        #end - move code
+        if self.subscribeDone:
+            self.memory.unsubscribeToEvent("ALTracker/TargetLost", self.getName())
+            self.memory.unsubscribeToEvent("ALTracker/TargetReached", self.getName())
+            self.subscribeDone = False
+
+        if self.isRunning:
+            self.tracker.setEffector("None")
+            self.tracker.stopTracker()
+            self.tracker.unregisterTarget(self.targetName)
+            self.isRunning = False
+
+    def onInput_onStart(self):
+        self.memory.subscribeToEvent("ALTracker/TargetLost", self.getName(), "onTargetLost")
+        self.memory.subscribeToEvent("ALTracker/TargetReached", self.getName(), "onTargetReached")
+        self.subscribeDone = True
+
+        mode = self.getParameter("Mode")
+        self.distanceX = self.getParameter("Distance X (m)")
+        self.thresholdX = self.getParameter("Threshold X (m)")
+        self.distanceY = self.getParameter("Distance Y (m)")
+        self.thresholdY = self.getParameter("Threshold Y (m)")
+        self.angleWz = self.getParameter("Theta (rad)")
+        self.thresholdWz = self.getParameter("Threshold Theta (rad)")
+        self.effector = self.getParameter("Effector")
+
+        self.tracker.setEffector(self.effector)
+
+        peopleIds = []
+
+        self.tracker.registerTarget(self.targetName, peopleIds)
+        self.tracker.setRelativePosition([-self.distanceX, self.distanceY, self.angleWz,
+                                           self.thresholdX, self.thresholdY, self.thresholdWz])
+        self.tracker.setMode(mode)
+
+        self.tracker.track(self.targetName) #Start tracker
+        self.isRunning = True
+
+    def onInput_onStop(self):
+        self.onStopped()
+        self.onUnload()
+
+    def onInput_peopleId(self, p):
+        if(p is None):
+            return
+
+        self.tracker.registerTarget(self.targetName, p)
+
+    def setParameter(self, parameterName, newValue):
+        GeneratedClass.setParameter(self, parameterName, newValue)
+        if (parameterName == 'Mode'):
+            self.tracker.setMode(newValue)
+            return
+
+        if (parameterName == "Distance X (m)"):
+            self.distanceX = newValue
+            self.tracker.setRelativePosition([-self.distanceX, self.distanceY, self.angleWz,
+                                               self.thresholdX, self.thresholdY, self.thresholdWz])
+            return
+
+        if (parameterName == "Distance Y (m)"):
+            self.distanceY = newValue
+            self.tracker.setRelativePosition([-self.distanceX, self.distanceY, self.angleWz,
+                                               self.thresholdX, self.thresholdY, self.thresholdWz])
+            return
+
+        if (parameterName == "Theta (rad)"):
+            self.angleWz = newValue
+            self.tracker.setRelativePosition([-self.distanceX, self.distanceY, self.angleWz,
+                                               self.thresholdX, self.thresholdY, self.thresholdWz])
+            return
+
+        if (parameterName == "Threshold X (m)"):
+            self.thresholdX = newValue
+            self.tracker.setRelativePosition([-self.distanceX, self.distanceY, self.angleWz,
+                                               self.thresholdX, self.thresholdY, self.thresholdWz])
+            return
+
+        if (parameterName == "Threshold Y (m)"):
+            self.thresholdY = newValue
+            self.tracker.setRelativePosition([-self.distanceX, self.distanceY, self.angleWz,
+                                               self.thresholdX, self.thresholdY, self.thresholdWz])
+            return
+
+        if (parameterName == "Threshold Theta (rad)"):
+            self.thresholdWz = newValue
+            self.tracker.setRelativePosition([-self.distanceX, self.distanceY, self.angleWz,
+                                               self.thresholdX, self.thresholdY, self.thresholdWz])
+            return
+
+        if(parameterName == "Effector"):
+            self.tracker.setEffector(newValue)
+            self.effector = newValue
+            return
+
+    def onTargetLost(self, key, value, message):
+        self.targetLost()
+
+    def onTargetReached(self, key, value, message):
+        self.targetReached()
+
+    def onTargetChanged(self, key, value, message):
+        if value == self.targetName and not self.subscribeDone:
+            self.memory.subscribeToEvent("ALTracker/TargetLost", self.getName(), "onTargetLost")
+            self.memory.subscribeToEvent("ALTracker/TargetReached", self.getName(), "onTargetReached")
+            self.subscribeDone = True
+        elif value != self.targetName and self.subscribeDone:
+            self.memory.unsubscribeToEvent("ALTracker/TargetLost", self.getName())
+            self.memory.unsubscribeToEvent("ALTracker/TargetReached", self.getName())
+            self.subscribeDone = False]]>
+</content>
+                            </script>
+                            <Input name="onLoad" type="1" type_size="1" nature="0" inner="1" tooltip="Signal sent when diagram is loaded." id="1" />
+                            <Input name="onStart" type="1" type_size="1" nature="2" inner="0" tooltip="Box behavior starts when a signal is received on this input." id="2" />
+                            <Input name="onStop" type="1" type_size="1" nature="3" inner="0" tooltip="Box behavior stops when a signal is received on this input." id="3" />
+                            <Input name="peopleId" type="0" type_size="1" nature="1" inner="0" tooltip="List of people id to track" id="4" />
+                            <Output name="onStopped" type="1" type_size="1" nature="1" inner="0" tooltip="Signal sent when box behavior is finished." id="5" />
+                            <Output name="targetLost" type="1" type_size="1" nature="2" inner="0" tooltip="Signal sent when the target is lost." id="6" />
+                            <Output name="targetReached" type="1" type_size="1" nature="2" inner="0" tooltip="Signal sent when the target is reached." id="7" />
+                            <Parameter name="Mode" inherits_from_parent="0" content_type="3" value="WholeBody" default_value="Head" custom_choice="0" tooltip="Set tracker mode" id="8">
+                                <Choice value="Head" />
+                                <Choice value="WholeBody" />
+                                <Choice value="Move" />
+                            </Parameter>
+                            <Parameter name="Effector" inherits_from_parent="0" content_type="3" value="Arms" default_value="None" custom_choice="0" tooltip="Set effector to use for tracking. Head is always used." id="9">
+                                <Choice value="None" />
+                                <Choice value="Arms" />
+                                <Choice value="LArm" />
+                                <Choice value="RArm" />
+                            </Parameter>
+                            <Parameter name="Distance X (m)" inherits_from_parent="0" content_type="2" value="0.711719" default_value="0.3" min="0.01" max="5" tooltip="Distance on X axis the robot will try to maintain from its target in move modes." id="10" />
+                            <Parameter name="Threshold X (m)" inherits_from_parent="0" content_type="2" value="0.1" default_value="0.1" min="0.01" max="1" tooltip="Threshold above which the robot will move to track its target in move modes." id="11" />
+                            <Parameter name="Distance Y (m)" inherits_from_parent="0" content_type="2" value="0" default_value="0" min="-5" max="5" tooltip="Distance on Y axis the robot will try to maintain from its target in move modes." id="12" />
+                            <Parameter name="Threshold Y (m)" inherits_from_parent="0" content_type="2" value="0.1" default_value="0.1" min="0.01" max="1" tooltip="Threshold above which the robot will move to track its target in move modes." id="13" />
+                            <Parameter name="Theta (rad)" inherits_from_parent="0" content_type="2" value="0" default_value="0" min="-3.14" max="3.14" tooltip="Wz angle of the vector robot-target the robot will try to maintain in move modes." id="14" />
+                            <Parameter name="Threshold Theta (rad)" inherits_from_parent="0" content_type="2" value="0.3" default_value="0.3" min="0.01" max="3.14" tooltip="Threshold of the angle of the vector robot-target above which the robot will move to track its target in move modes." id="15" />
+                        </Box>
+                        <Box name="Zombie20160603Fri1621" id="8" localization="-1" tooltip="This box makes the robot track people with different modes." x="1086" y="315">
+                            <bitmap>media/images/box/interaction/target_face.png</bitmap>
+                            <script language="4">
+                                <content>
+                                    <![CDATA[import time
+
+class MyClass(GeneratedClass):
+    def __init__(self):
+        GeneratedClass.__init__(self)
+        self.tracker = ALProxy( "ALTracker" )
+        self.memory = ALProxy("ALMemory")
+        self.targetName = "People"
+        self.distanceX = 0.0
+        self.distanceY = 0.0
+        self.angleWz = 0.0
+        self.thresholdX = 0.0
+        self.thresholdY = 0.0
+        self.thresholdWz = 0.0
+        self.effector = "None"
+        self.subscribeDone = False
+        self.isRunning = False
+
+    def onLoad(self):
+        #start - move code
+        import threading
+        self.motion = ALProxy("ALMotion")
+        self.x = 0
+        self.y = 0
+        self.theta = 0
+        self.ptask = qi.PeriodicTask()
+        self.lock = threading.RLock()
+        #end - move code
+        self.BIND_PYTHON(self.getName(), "setParameter")
+        self.BIND_PYTHON(self.getName(), "onTargetLost")
+        self.BIND_PYTHON(self.getName(), "onTargetReached")
+        self.BIND_PYTHON(self.getName(), "onTargetChanged")
+        self.memory.subscribeToEvent("ALTracker/ActiveTargetChanged", self.getName(), "onTargetChanged")
+
+    def onUnload(self):
+        #start - move code
+        with self.lock:
+            self.ptask.stop()
+            self.x = 0
+            self.y = 0
+            self.theta = 0
+            self.motion.moveToward(0, 0, 0)
+            self.motion.waitUntilMoveIsFinished()
+        #end - move code
+        if self.subscribeDone:
+            self.memory.unsubscribeToEvent("ALTracker/TargetLost", self.getName())
+            self.memory.unsubscribeToEvent("ALTracker/TargetReached", self.getName())
+            self.subscribeDone = False
+
+        if self.isRunning:
+            self.tracker.setEffector("None")
+            self.tracker.stopTracker()
+            self.tracker.unregisterTarget(self.targetName)
+            self.isRunning = False
+
+    def onInput_onStart(self):
+        self.memory.subscribeToEvent("ALTracker/TargetLost", self.getName(), "onTargetLost")
+        self.memory.subscribeToEvent("ALTracker/TargetReached", self.getName(), "onTargetReached")
+        self.subscribeDone = True
+
+        mode = self.getParameter("Mode")
+        self.distanceX = self.getParameter("Distance X (m)")
+        self.thresholdX = self.getParameter("Threshold X (m)")
+        self.distanceY = self.getParameter("Distance Y (m)")
+        self.thresholdY = self.getParameter("Threshold Y (m)")
+        self.angleWz = self.getParameter("Theta (rad)")
+        self.thresholdWz = self.getParameter("Threshold Theta (rad)")
+        self.effector = self.getParameter("Effector")
+
+        self.tracker.setEffector(self.effector)
+
+        peopleIds = []
+
+        self.tracker.registerTarget(self.targetName, peopleIds)
+        self.tracker.setRelativePosition([-self.distanceX, self.distanceY, self.angleWz,
+                                           self.thresholdX, self.thresholdY, self.thresholdWz])
+        self.tracker.setMode(mode)
+
+        self.tracker.track(self.targetName) #Start tracker
+        self.isRunning = True
+
+    def onInput_onStop(self):
+        self.onStopped()
+        self.onUnload()
+
+    def onInput_peopleId(self, p):
+        if(p is None):
+            return
+
+        self.tracker.registerTarget(self.targetName, p)
+
+    def setParameter(self, parameterName, newValue):
+        GeneratedClass.setParameter(self, parameterName, newValue)
+        if (parameterName == 'Mode'):
+            self.tracker.setMode(newValue)
+            return
+
+        if (parameterName == "Distance X (m)"):
+            self.distanceX = newValue
+            self.tracker.setRelativePosition([-self.distanceX, self.distanceY, self.angleWz,
+                                               self.thresholdX, self.thresholdY, self.thresholdWz])
+            return
+
+        if (parameterName == "Distance Y (m)"):
+            self.distanceY = newValue
+            self.tracker.setRelativePosition([-self.distanceX, self.distanceY, self.angleWz,
+                                               self.thresholdX, self.thresholdY, self.thresholdWz])
+            return
+
+        if (parameterName == "Theta (rad)"):
+            self.angleWz = newValue
+            self.tracker.setRelativePosition([-self.distanceX, self.distanceY, self.angleWz,
+                                               self.thresholdX, self.thresholdY, self.thresholdWz])
+            return
+
+        if (parameterName == "Threshold X (m)"):
+            self.thresholdX = newValue
+            self.tracker.setRelativePosition([-self.distanceX, self.distanceY, self.angleWz,
+                                               self.thresholdX, self.thresholdY, self.thresholdWz])
+            return
+
+        if (parameterName == "Threshold Y (m)"):
+            self.thresholdY = newValue
+            self.tracker.setRelativePosition([-self.distanceX, self.distanceY, self.angleWz,
+                                               self.thresholdX, self.thresholdY, self.thresholdWz])
+            return
+
+        if (parameterName == "Threshold Theta (rad)"):
+            self.thresholdWz = newValue
+            self.tracker.setRelativePosition([-self.distanceX, self.distanceY, self.angleWz,
+                                               self.thresholdX, self.thresholdY, self.thresholdWz])
+            return
+
+        if(parameterName == "Effector"):
+            self.tracker.setEffector(newValue)
+            self.effector = newValue
+            return
+
+    def onTargetLost(self, key, value, message):
+        self.targetLost()
+
+    def onTargetReached(self, key, value, message):
+        self.targetReached()
+
+    def onTargetChanged(self, key, value, message):
+        if value == self.targetName and not self.subscribeDone:
+            self.memory.subscribeToEvent("ALTracker/TargetLost", self.getName(), "onTargetLost")
+            self.memory.subscribeToEvent("ALTracker/TargetReached", self.getName(), "onTargetReached")
+            self.subscribeDone = True
+        elif value != self.targetName and self.subscribeDone:
+            self.memory.unsubscribeToEvent("ALTracker/TargetLost", self.getName())
+            self.memory.unsubscribeToEvent("ALTracker/TargetReached", self.getName())
+            self.subscribeDone = False]]>
+</content>
+                            </script>
+                            <Input name="onLoad" type="1" type_size="1" nature="0" inner="1" tooltip="Signal sent when diagram is loaded." id="1" />
+                            <Input name="onStart" type="1" type_size="1" nature="2" inner="0" tooltip="Box behavior starts when a signal is received on this input." id="2" />
+                            <Input name="onStop" type="1" type_size="1" nature="3" inner="0" tooltip="Box behavior stops when a signal is received on this input." id="3" />
+                            <Input name="peopleId" type="0" type_size="1" nature="1" inner="0" tooltip="List of people id to track" id="4" />
+                            <Output name="onStopped" type="1" type_size="1" nature="1" inner="0" tooltip="Signal sent when box behavior is finished." id="5" />
+                            <Output name="targetLost" type="1" type_size="1" nature="2" inner="0" tooltip="Signal sent when the target is lost." id="6" />
+                            <Output name="targetReached" type="1" type_size="1" nature="2" inner="0" tooltip="Signal sent when the target is reached." id="7" />
+                            <Parameter name="Mode" inherits_from_parent="0" content_type="3" value="WholeBody" default_value="Head" custom_choice="0" tooltip="Set tracker mode" id="8">
+                                <Choice value="Head" />
+                                <Choice value="WholeBody" />
+                                <Choice value="Move" />
+                            </Parameter>
+                            <Parameter name="Effector" inherits_from_parent="0" content_type="3" value="Arms" default_value="None" custom_choice="0" tooltip="Set effector to use for tracking. Head is always used." id="9">
+                                <Choice value="None" />
+                                <Choice value="Arms" />
+                                <Choice value="LArm" />
+                                <Choice value="RArm" />
+                            </Parameter>
+                            <Parameter name="Distance X (m)" inherits_from_parent="0" content_type="2" value="0.711719" default_value="0.3" min="0.01" max="5" tooltip="Distance on X axis the robot will try to maintain from its target in move modes." id="10" />
+                            <Parameter name="Threshold X (m)" inherits_from_parent="0" content_type="2" value="0.1" default_value="0.1" min="0.01" max="1" tooltip="Threshold above which the robot will move to track its target in move modes." id="11" />
+                            <Parameter name="Distance Y (m)" inherits_from_parent="0" content_type="2" value="0" default_value="0" min="-5" max="5" tooltip="Distance on Y axis the robot will try to maintain from its target in move modes." id="12" />
+                            <Parameter name="Threshold Y (m)" inherits_from_parent="0" content_type="2" value="0.1" default_value="0.1" min="0.01" max="1" tooltip="Threshold above which the robot will move to track its target in move modes." id="13" />
+                            <Parameter name="Theta (rad)" inherits_from_parent="0" content_type="2" value="0" default_value="0" min="-3.14" max="3.14" tooltip="Wz angle of the vector robot-target the robot will try to maintain in move modes." id="14" />
+                            <Parameter name="Threshold Theta (rad)" inherits_from_parent="0" content_type="2" value="0.3" default_value="0.3" min="0.01" max="3.14" tooltip="Threshold of the angle of the vector robot-target above which the robot will move to track its target in move modes." id="15" />
+                            <Parameter name="MoveToward" inherits_from_parent="1" content_type="2" value="1" default_value="0" min="-1" max="1" tooltip="" id="16" />
+                        </Box>
+                        <Box name="Zombie20160603Fri1622" id="9" localization="-1" tooltip="This box makes the robot track people with different modes." x="1078" y="416">
+                            <bitmap>media/images/box/interaction/target_face.png</bitmap>
+                            <script language="4">
+                                <content>
+                                    <![CDATA[import time
+
+class MyClass(GeneratedClass):
+    def __init__(self):
+        GeneratedClass.__init__(self)
+        self.tracker = ALProxy( "ALTracker" )
+        self.memory = ALProxy("ALMemory")
+        self.targetName = "People"
+        self.distanceX = 0.0
+        self.distanceY = 0.0
+        self.angleWz = 0.0
+        self.thresholdX = 0.0
+        self.thresholdY = 0.0
+        self.thresholdWz = 0.0
+        self.effector = "None"
+        self.subscribeDone = False
+        self.isRunning = False
+
+    def onLoad(self):
+        #start - move code
+        import threading
+        self.motion = ALProxy("ALMotion")
+        self.x = 0
+        self.y = 0
+        self.theta = 0
+        self.ptask = qi.PeriodicTask()
+        self.lock = threading.RLock()
+        #end - move code
+        self.BIND_PYTHON(self.getName(), "setParameter")
+        self.BIND_PYTHON(self.getName(), "onTargetLost")
+        self.BIND_PYTHON(self.getName(), "onTargetReached")
+        self.BIND_PYTHON(self.getName(), "onTargetChanged")
+        self.memory.subscribeToEvent("ALTracker/ActiveTargetChanged", self.getName(), "onTargetChanged")
+
+    def onUnload(self):
+        #start - move code
+        with self.lock:
+            self.ptask.stop()
+            self.x = 0
+            self.y = 0
+            self.theta = 0
+            self.motion.moveToward(0, 0, 0)
+            self.motion.waitUntilMoveIsFinished()
+        #end - move code
+        if self.subscribeDone:
+            self.memory.unsubscribeToEvent("ALTracker/TargetLost", self.getName())
+            self.memory.unsubscribeToEvent("ALTracker/TargetReached", self.getName())
+            self.subscribeDone = False
+
+        if self.isRunning:
+            self.tracker.setEffector("None")
+            self.tracker.stopTracker()
+            self.tracker.unregisterTarget(self.targetName)
+            self.isRunning = False
+
+    def onInput_onStart(self):
+        self.memory.subscribeToEvent("ALTracker/TargetLost", self.getName(), "onTargetLost")
+        self.memory.subscribeToEvent("ALTracker/TargetReached", self.getName(), "onTargetReached")
+        self.subscribeDone = True
+
+        mode = self.getParameter("Mode")
+        self.distanceX = self.getParameter("Distance X (m)")
+        self.thresholdX = self.getParameter("Threshold X (m)")
+        self.distanceY = self.getParameter("Distance Y (m)")
+        self.thresholdY = self.getParameter("Threshold Y (m)")
+        self.angleWz = self.getParameter("Theta (rad)")
+        self.thresholdWz = self.getParameter("Threshold Theta (rad)")
+        self.effector = self.getParameter("Effector")
+
+        self.tracker.setEffector(self.effector)
+
+        peopleIds = []
+
+        self.tracker.registerTarget(self.targetName, peopleIds)
+        self.tracker.setRelativePosition([-self.distanceX, self.distanceY, self.angleWz,
+                                           self.thresholdX, self.thresholdY, self.thresholdWz])
+        self.tracker.setMode(mode)
+
+        self.tracker.track(self.targetName) #Start tracker
+        self.isRunning = True
+
+    def onInput_onStop(self):
+        self.onStopped()
+        self.onUnload()
+
+    def onInput_peopleId(self, p):
+        if(p is None):
+            return
+
+        self.tracker.registerTarget(self.targetName, p)
+
+    def setParameter(self, parameterName, newValue):
+        GeneratedClass.setParameter(self, parameterName, newValue)
+        if (parameterName == 'Mode'):
+            self.tracker.setMode(newValue)
+            return
+
+        if (parameterName == "Distance X (m)"):
+            self.distanceX = newValue
+            self.tracker.setRelativePosition([-self.distanceX, self.distanceY, self.angleWz,
+                                               self.thresholdX, self.thresholdY, self.thresholdWz])
+            return
+
+        if (parameterName == "Distance Y (m)"):
+            self.distanceY = newValue
+            self.tracker.setRelativePosition([-self.distanceX, self.distanceY, self.angleWz,
+                                               self.thresholdX, self.thresholdY, self.thresholdWz])
+            return
+
+        if (parameterName == "Theta (rad)"):
+            self.angleWz = newValue
+            self.tracker.setRelativePosition([-self.distanceX, self.distanceY, self.angleWz,
+                                               self.thresholdX, self.thresholdY, self.thresholdWz])
+            return
+
+        if (parameterName == "Threshold X (m)"):
+            self.thresholdX = newValue
+            self.tracker.setRelativePosition([-self.distanceX, self.distanceY, self.angleWz,
+                                               self.thresholdX, self.thresholdY, self.thresholdWz])
+            return
+
+        if (parameterName == "Threshold Y (m)"):
+            self.thresholdY = newValue
+            self.tracker.setRelativePosition([-self.distanceX, self.distanceY, self.angleWz,
+                                               self.thresholdX, self.thresholdY, self.thresholdWz])
+            return
+
+        if (parameterName == "Threshold Theta (rad)"):
+            self.thresholdWz = newValue
+            self.tracker.setRelativePosition([-self.distanceX, self.distanceY, self.angleWz,
+                                               self.thresholdX, self.thresholdY, self.thresholdWz])
+            return
+
+        if(parameterName == "Effector"):
+            self.tracker.setEffector(newValue)
+            self.effector = newValue
+            return
+
+    def onTargetLost(self, key, value, message):
+        self.targetLost()
+
+    def onTargetReached(self, key, value, message):
+        self.targetReached()
+
+    def onTargetChanged(self, key, value, message):
+        if value == self.targetName and not self.subscribeDone:
+            self.memory.subscribeToEvent("ALTracker/TargetLost", self.getName(), "onTargetLost")
+            self.memory.subscribeToEvent("ALTracker/TargetReached", self.getName(), "onTargetReached")
+            self.subscribeDone = True
+        elif value != self.targetName and self.subscribeDone:
+            self.memory.unsubscribeToEvent("ALTracker/TargetLost", self.getName())
+            self.memory.unsubscribeToEvent("ALTracker/TargetReached", self.getName())
+            self.subscribeDone = False
+
+    #start - move code
+    def updateMovement(self):
+        import math
+        with self.lock:
+            enableArms = self.getParameter("Arms movement enabled")
+            self.motion.setMoveArmsEnabled(enableArms, enableArms)
+            x = self.getParameter("X")
+            y = self.getParameter("Y")
+            theta = self.getParameter("Theta")
+            period = self.getParameter("Period of direction update (s)")
+            epsilon = 0.0001
+            dx = math.fabs(x - self.x)
+            dy = math.fabs(y - self.y)
+            dt = math.fabs(theta - self.theta)
+
+            # Update moveToward parameters
+            if(dx > epsilon or dy > epsilon or dt > epsilon):
+                self.x=x
+                self.y=y
+                self.theta=theta
+                self.motion.moveToward(self.x, self.y, self.theta)
+
+            # Check if the move has been canceled
+            if (not self.motion.moveIsActive()):
+                self.moveFailed()
+
+            us_period = int(period*1000000)
+            self.ptask.setUsPeriod(us_period)
+    #end - move code]]>
+</content>
+                            </script>
+                            <Input name="onLoad" type="1" type_size="1" nature="0" inner="1" tooltip="Signal sent when diagram is loaded." id="1" />
+                            <Input name="onStart" type="1" type_size="1" nature="2" inner="0" tooltip="Box behavior starts when a signal is received on this input." id="2" />
+                            <Input name="onStop" type="1" type_size="1" nature="3" inner="0" tooltip="Box behavior stops when a signal is received on this input." id="3" />
+                            <Input name="peopleId" type="0" type_size="1" nature="1" inner="0" tooltip="List of people id to track" id="4" />
+                            <Output name="onStopped" type="1" type_size="1" nature="1" inner="0" tooltip="Signal sent when box behavior is finished." id="5" />
+                            <Output name="targetLost" type="1" type_size="1" nature="2" inner="0" tooltip="Signal sent when the target is lost." id="6" />
+                            <Output name="targetReached" type="1" type_size="1" nature="2" inner="0" tooltip="Signal sent when the target is reached." id="7" />
+                            <Parameter name="Mode" inherits_from_parent="0" content_type="3" value="WholeBody" default_value="Head" custom_choice="0" tooltip="Set tracker mode" id="8">
+                                <Choice value="Head" />
+                                <Choice value="WholeBody" />
+                                <Choice value="Move" />
+                            </Parameter>
+                            <Parameter name="Effector" inherits_from_parent="0" content_type="3" value="Arms" default_value="None" custom_choice="0" tooltip="Set effector to use for tracking. Head is always used." id="9">
+                                <Choice value="None" />
+                                <Choice value="Arms" />
+                                <Choice value="LArm" />
+                                <Choice value="RArm" />
+                            </Parameter>
+                            <Parameter name="Distance X (m)" inherits_from_parent="0" content_type="2" value="0.711719" default_value="0.3" min="0.01" max="5" tooltip="Distance on X axis the robot will try to maintain from its target in move modes." id="10" />
+                            <Parameter name="Threshold X (m)" inherits_from_parent="0" content_type="2" value="0.1" default_value="0.1" min="0.01" max="1" tooltip="Threshold above which the robot will move to track its target in move modes." id="11" />
+                            <Parameter name="Distance Y (m)" inherits_from_parent="0" content_type="2" value="0" default_value="0" min="-5" max="5" tooltip="Distance on Y axis the robot will try to maintain from its target in move modes." id="12" />
+                            <Parameter name="Threshold Y (m)" inherits_from_parent="0" content_type="2" value="0.1" default_value="0.1" min="0.01" max="1" tooltip="Threshold above which the robot will move to track its target in move modes." id="13" />
+                            <Parameter name="Theta (rad)" inherits_from_parent="0" content_type="2" value="0" default_value="0" min="-3.14" max="3.14" tooltip="Wz angle of the vector robot-target the robot will try to maintain in move modes." id="14" />
+                            <Parameter name="Threshold Theta (rad)" inherits_from_parent="0" content_type="2" value="0.3" default_value="0.3" min="0.01" max="3.14" tooltip="Threshold of the angle of the vector robot-target above which the robot will move to track its target in move modes." id="15" />
+                            <Parameter name="MoveToward" inherits_from_parent="1" content_type="2" value="1" default_value="0" min="-1" max="1" tooltip="" id="16" />
+                        </Box>
+                        <Box name="Zombie20160603Fri1625" id="11" localization="-1" tooltip="This box makes the robot track people with different modes." x="1070" y="518">
+                            <bitmap>media/images/box/interaction/target_face.png</bitmap>
+                            <script language="4">
+                                <content>
+                                    <![CDATA[import time
+
+class MyClass(GeneratedClass):
+    def __init__(self):
+        GeneratedClass.__init__(self)
+        self.tracker = ALProxy( "ALTracker" )
+        self.memory = ALProxy("ALMemory")
+        self.targetName = "People"
+        self.distanceX = 0.0
+        self.distanceY = 0.0
+        self.angleWz = 0.0
+        self.thresholdX = 0.0
+        self.thresholdY = 0.0
+        self.thresholdWz = 0.0
+        self.effector = "None"
+        self.subscribeDone = False
+        self.isRunning = False
+
+    def onLoad(self):
+        #start - move code
+        import threading
+        self.motion = ALProxy("ALMotion")
+        self.x = 0
+        self.y = 0
+        self.theta = 0
+        self.ptask = qi.PeriodicTask()
+        self.lock = threading.RLock()
+        #end - move code
+        self.BIND_PYTHON(self.getName(), "setParameter")
+        self.BIND_PYTHON(self.getName(), "onTargetLost")
+        self.BIND_PYTHON(self.getName(), "onTargetReached")
+        self.BIND_PYTHON(self.getName(), "onTargetChanged")
+        self.memory.subscribeToEvent("ALTracker/ActiveTargetChanged", self.getName(), "onTargetChanged")
+
+    def onUnload(self):
+        #start - move code
+        with self.lock:
+            self.ptask.stop()
+            self.x = 0
+            self.y = 0
+            self.theta = 0
+            self.motion.moveToward(0, 0, 0)
+            self.motion.waitUntilMoveIsFinished()
+        #end - move code
+        if self.subscribeDone:
+            self.memory.unsubscribeToEvent("ALTracker/TargetLost", self.getName())
+            self.memory.unsubscribeToEvent("ALTracker/TargetReached", self.getName())
+            self.subscribeDone = False
+
+        if self.isRunning:
+            self.tracker.setEffector("None")
+            self.tracker.stopTracker()
+            self.tracker.unregisterTarget(self.targetName)
+            self.isRunning = False
+
+    def onInput_onStart(self):
+        self.memory.subscribeToEvent("ALTracker/TargetLost", self.getName(), "onTargetLost")
+        self.memory.subscribeToEvent("ALTracker/TargetReached", self.getName(), "onTargetReached")
+        self.subscribeDone = True
+
+        mode = self.getParameter("Mode")
+        self.distanceX = self.getParameter("Distance X (m)")
+        self.thresholdX = self.getParameter("Threshold X (m)")
+        self.distanceY = self.getParameter("Distance Y (m)")
+        self.thresholdY = self.getParameter("Threshold Y (m)")
+        self.angleWz = self.getParameter("Theta (rad)")
+        self.thresholdWz = self.getParameter("Threshold Theta (rad)")
+        self.effector = self.getParameter("Effector")
+
+        self.tracker.setEffector(self.effector)
+
+        peopleIds = []
+
+        self.tracker.registerTarget(self.targetName, peopleIds)
+        self.tracker.setRelativePosition([-self.distanceX, self.distanceY, self.angleWz,
+                                           self.thresholdX, self.thresholdY, self.thresholdWz])
+        self.tracker.setMode(mode)
+
+        self.tracker.track(self.targetName) #Start tracker
+        self.isRunning = True
+
+    def onInput_onStop(self):
+        self.onStopped()
+        self.onUnload()
+
+    def onInput_peopleId(self, p):
+        if(p is None):
+            return
+
+        self.tracker.registerTarget(self.targetName, p)
+
+    def setParameter(self, parameterName, newValue):
+        GeneratedClass.setParameter(self, parameterName, newValue)
+        if (parameterName == 'Mode'):
+            self.tracker.setMode(newValue)
+            return
+
+        if (parameterName == "Distance X (m)"):
+            self.distanceX = newValue
+            self.tracker.setRelativePosition([-self.distanceX, self.distanceY, self.angleWz,
+                                               self.thresholdX, self.thresholdY, self.thresholdWz])
+            return
+
+        if (parameterName == "Distance Y (m)"):
+            self.distanceY = newValue
+            self.tracker.setRelativePosition([-self.distanceX, self.distanceY, self.angleWz,
+                                               self.thresholdX, self.thresholdY, self.thresholdWz])
+            return
+
+        if (parameterName == "Theta (rad)"):
+            self.angleWz = newValue
+            self.tracker.setRelativePosition([-self.distanceX, self.distanceY, self.angleWz,
+                                               self.thresholdX, self.thresholdY, self.thresholdWz])
+            return
+
+        if (parameterName == "Threshold X (m)"):
+            self.thresholdX = newValue
+            self.tracker.setRelativePosition([-self.distanceX, self.distanceY, self.angleWz,
+                                               self.thresholdX, self.thresholdY, self.thresholdWz])
+            return
+
+        if (parameterName == "Threshold Y (m)"):
+            self.thresholdY = newValue
+            self.tracker.setRelativePosition([-self.distanceX, self.distanceY, self.angleWz,
+                                               self.thresholdX, self.thresholdY, self.thresholdWz])
+            return
+
+        if (parameterName == "Threshold Theta (rad)"):
+            self.thresholdWz = newValue
+            self.tracker.setRelativePosition([-self.distanceX, self.distanceY, self.angleWz,
+                                               self.thresholdX, self.thresholdY, self.thresholdWz])
+            return
+
+        if(parameterName == "Effector"):
+            self.tracker.setEffector(newValue)
+            self.effector = newValue
+            return
+
+    def onTargetLost(self, key, value, message):
+        self.targetLost()
+
+    def onTargetReached(self, key, value, message):
+        self.targetReached()
+
+    def onTargetChanged(self, key, value, message):
+        if value == self.targetName and not self.subscribeDone:
+            self.memory.subscribeToEvent("ALTracker/TargetLost", self.getName(), "onTargetLost")
+            self.memory.subscribeToEvent("ALTracker/TargetReached", self.getName(), "onTargetReached")
+            self.subscribeDone = True
+        elif value != self.targetName and self.subscribeDone:
+            self.memory.unsubscribeToEvent("ALTracker/TargetLost", self.getName())
+            self.memory.unsubscribeToEvent("ALTracker/TargetReached", self.getName())
+            self.subscribeDone = False
+
+    #start - move code
+    def moveFailed(self):
+        self.onUnload()
+        self.onMoveFailed()
+
+    def updateMovement(self):
+        import math
+        with self.lock:
+            enableArms = self.getParameter("Arms movement enabled")
+            self.motion.setMoveArmsEnabled(enableArms, enableArms)
+            x = self.getParameter("X")
+            y = self.getParameter("Y")
+            theta = self.getParameter("Theta")
+            period = self.getParameter("Period of direction update (s)")
+            epsilon = 0.0001
+            dx = math.fabs(x - self.x)
+            dy = math.fabs(y - self.y)
+            dt = math.fabs(theta - self.theta)
+
+            # Update moveToward parameters
+            if(dx > epsilon or dy > epsilon or dt > epsilon):
+                self.x=x
+                self.y=y
+                self.theta=theta
+                self.motion.moveToward(self.x, self.y, self.theta)
+
+            # Check if the move has been canceled
+            if (not self.motion.moveIsActive()):
+                self.moveFailed()
+
+            us_period = int(period*1000000)
+            self.ptask.setUsPeriod(us_period)
+    #end - move code]]>
+</content>
+                            </script>
+                            <Input name="onLoad" type="1" type_size="1" nature="0" inner="1" tooltip="Signal sent when diagram is loaded." id="1" />
+                            <Input name="onStart" type="1" type_size="1" nature="2" inner="0" tooltip="Box behavior starts when a signal is received on this input." id="2" />
+                            <Input name="onStop" type="1" type_size="1" nature="3" inner="0" tooltip="Box behavior stops when a signal is received on this input." id="3" />
+                            <Input name="peopleId" type="0" type_size="1" nature="1" inner="0" tooltip="List of people id to track" id="4" />
+                            <Output name="onStopped" type="1" type_size="1" nature="1" inner="0" tooltip="Signal sent when box behavior is finished." id="5" />
+                            <Output name="targetLost" type="1" type_size="1" nature="2" inner="0" tooltip="Signal sent when the target is lost." id="6" />
+                            <Output name="targetReached" type="1" type_size="1" nature="2" inner="0" tooltip="Signal sent when the target is reached." id="7" />
+                            <Parameter name="Mode" inherits_from_parent="0" content_type="3" value="WholeBody" default_value="Head" custom_choice="0" tooltip="Set tracker mode" id="8">
+                                <Choice value="Head" />
+                                <Choice value="WholeBody" />
+                                <Choice value="Move" />
+                            </Parameter>
+                            <Parameter name="Effector" inherits_from_parent="0" content_type="3" value="Arms" default_value="None" custom_choice="0" tooltip="Set effector to use for tracking. Head is always used." id="9">
+                                <Choice value="None" />
+                                <Choice value="Arms" />
+                                <Choice value="LArm" />
+                                <Choice value="RArm" />
+                            </Parameter>
+                            <Parameter name="Distance X (m)" inherits_from_parent="0" content_type="2" value="0.711719" default_value="0.3" min="0.01" max="5" tooltip="Distance on X axis the robot will try to maintain from its target in move modes." id="10" />
+                            <Parameter name="Threshold X (m)" inherits_from_parent="0" content_type="2" value="0.1" default_value="0.1" min="0.01" max="1" tooltip="Threshold above which the robot will move to track its target in move modes." id="11" />
+                            <Parameter name="Distance Y (m)" inherits_from_parent="0" content_type="2" value="0" default_value="0" min="-5" max="5" tooltip="Distance on Y axis the robot will try to maintain from its target in move modes." id="12" />
+                            <Parameter name="Threshold Y (m)" inherits_from_parent="0" content_type="2" value="0.1" default_value="0.1" min="0.01" max="1" tooltip="Threshold above which the robot will move to track its target in move modes." id="13" />
+                            <Parameter name="Theta (rad)" inherits_from_parent="0" content_type="2" value="0" default_value="0" min="-3.14" max="3.14" tooltip="Wz angle of the vector robot-target the robot will try to maintain in move modes." id="14" />
+                            <Parameter name="Threshold Theta (rad)" inherits_from_parent="0" content_type="2" value="0.3" default_value="0.3" min="0.01" max="3.14" tooltip="Threshold of the angle of the vector robot-target above which the robot will move to track its target in move modes." id="15" />
+                            <Parameter name="MoveToward" inherits_from_parent="1" content_type="2" value="1" default_value="0" min="-1" max="1" tooltip="" id="16" />
+                        </Box>
+                        <Box name="Zombie20160603Fri1627" id="13" localization="-1" tooltip="This box makes the robot track people with different modes." x="1059" y="627">
+                            <bitmap>media/images/box/interaction/target_face.png</bitmap>
+                            <script language="4">
+                                <content>
+                                    <![CDATA[import time
+
+class MyClass(GeneratedClass):
+    def __init__(self):
+        GeneratedClass.__init__(self)
+        self.tracker = ALProxy( "ALTracker" )
+        self.memory = ALProxy("ALMemory")
+        self.targetName = "People"
+        self.distanceX = 0.0
+        self.distanceY = 0.0
+        self.angleWz = 0.0
+        self.thresholdX = 0.0
+        self.thresholdY = 0.0
+        self.thresholdWz = 0.0
+        self.effector = "None"
+        self.subscribeDone = False
+        self.isRunning = False
+
+    def onLoad(self):
+        #start - move code
+        import threading
+        self.motion = ALProxy("ALMotion")
+        self.x = 0
+        self.y = 0
+        self.theta = 0
+        self.ptask = qi.PeriodicTask()
+        self.lock = threading.RLock()
+        #end - move code
+        self.BIND_PYTHON(self.getName(), "setParameter")
+        self.BIND_PYTHON(self.getName(), "onTargetLost")
+        self.BIND_PYTHON(self.getName(), "onTargetReached")
+        self.BIND_PYTHON(self.getName(), "onTargetChanged")
+        self.memory.subscribeToEvent("ALTracker/ActiveTargetChanged", self.getName(), "onTargetChanged")
+
+    def onUnload(self):
+        #start - move code
+        with self.lock:
+            self.ptask.stop()
+            self.x = 0
+            self.y = 0
+            self.theta = 0
+            self.motion.moveToward(0, 0, 0)
+            self.motion.waitUntilMoveIsFinished()
+        #end - move code
+        if self.subscribeDone:
+            self.memory.unsubscribeToEvent("ALTracker/TargetLost", self.getName())
+            self.memory.unsubscribeToEvent("ALTracker/TargetReached", self.getName())
+            self.subscribeDone = False
+
+        if self.isRunning:
+            self.tracker.setEffector("None")
+            self.tracker.stopTracker()
+            self.tracker.unregisterTarget(self.targetName)
+            self.isRunning = False
+
+    def onInput_onStart(self):
+        #start - move code
+        with self.lock:
+            #period = self.getParameter("Period of direction update (s)")
+            #us_period = int(period*1000000)
+            us_period = int(1000000)
+
+            self.ptask.compensateCallbackTime(True)
+            self.ptask.setCallback(self.updateMovement)
+            self.ptask.setUsPeriod(us_period)
+            self.ptask.start(True)
+        #end - move code
+        self.memory.subscribeToEvent("ALTracker/TargetLost", self.getName(), "onTargetLost")
+        self.memory.subscribeToEvent("ALTracker/TargetReached", self.getName(), "onTargetReached")
+        self.subscribeDone = True
+
+        mode = self.getParameter("Mode")
+        self.distanceX = self.getParameter("Distance X (m)")
+        self.thresholdX = self.getParameter("Threshold X (m)")
+        self.distanceY = self.getParameter("Distance Y (m)")
+        self.thresholdY = self.getParameter("Threshold Y (m)")
+        self.angleWz = self.getParameter("Theta (rad)")
+        self.thresholdWz = self.getParameter("Threshold Theta (rad)")
+        self.effector = self.getParameter("Effector")
+
+        self.tracker.setEffector(self.effector)
+
+        peopleIds = []
+
+        self.tracker.registerTarget(self.targetName, peopleIds)
+        self.tracker.setRelativePosition([-self.distanceX, self.distanceY, self.angleWz,
+                                           self.thresholdX, self.thresholdY, self.thresholdWz])
+        self.tracker.setMode(mode)
+
+        self.tracker.track(self.targetName) #Start tracker
+        self.isRunning = True
+
+    def onInput_onStop(self):
+        self.onStopped()
+        self.onUnload()
+
+    def onInput_peopleId(self, p):
+        if(p is None):
+            return
+
+        self.tracker.registerTarget(self.targetName, p)
+
+    def setParameter(self, parameterName, newValue):
+        GeneratedClass.setParameter(self, parameterName, newValue)
+        if (parameterName == 'Mode'):
+            self.tracker.setMode(newValue)
+            return
+
+        if (parameterName == "Distance X (m)"):
+            self.distanceX = newValue
+            self.tracker.setRelativePosition([-self.distanceX, self.distanceY, self.angleWz,
+                                               self.thresholdX, self.thresholdY, self.thresholdWz])
+            return
+
+        if (parameterName == "Distance Y (m)"):
+            self.distanceY = newValue
+            self.tracker.setRelativePosition([-self.distanceX, self.distanceY, self.angleWz,
+                                               self.thresholdX, self.thresholdY, self.thresholdWz])
+            return
+
+        if (parameterName == "Theta (rad)"):
+            self.angleWz = newValue
+            self.tracker.setRelativePosition([-self.distanceX, self.distanceY, self.angleWz,
+                                               self.thresholdX, self.thresholdY, self.thresholdWz])
+            return
+
+        if (parameterName == "Threshold X (m)"):
+            self.thresholdX = newValue
+            self.tracker.setRelativePosition([-self.distanceX, self.distanceY, self.angleWz,
+                                               self.thresholdX, self.thresholdY, self.thresholdWz])
+            return
+
+        if (parameterName == "Threshold Y (m)"):
+            self.thresholdY = newValue
+            self.tracker.setRelativePosition([-self.distanceX, self.distanceY, self.angleWz,
+                                               self.thresholdX, self.thresholdY, self.thresholdWz])
+            return
+
+        if (parameterName == "Threshold Theta (rad)"):
+            self.thresholdWz = newValue
+            self.tracker.setRelativePosition([-self.distanceX, self.distanceY, self.angleWz,
+                                               self.thresholdX, self.thresholdY, self.thresholdWz])
+            return
+
+        if(parameterName == "Effector"):
+            self.tracker.setEffector(newValue)
+            self.effector = newValue
+            return
+
+    def onTargetLost(self, key, value, message):
+        self.targetLost()
+
+    def onTargetReached(self, key, value, message):
+        self.targetReached()
+
+    def onTargetChanged(self, key, value, message):
+        if value == self.targetName and not self.subscribeDone:
+            self.memory.subscribeToEvent("ALTracker/TargetLost", self.getName(), "onTargetLost")
+            self.memory.subscribeToEvent("ALTracker/TargetReached", self.getName(), "onTargetReached")
+            self.subscribeDone = True
+        elif value != self.targetName and self.subscribeDone:
+            self.memory.unsubscribeToEvent("ALTracker/TargetLost", self.getName())
+            self.memory.unsubscribeToEvent("ALTracker/TargetReached", self.getName())
+            self.subscribeDone = False
+
+    #start - move code
+    def moveFailed(self):
+        self.onUnload()
+        self.onMoveFailed()
+
+    def updateMovement(self):
+        import math
+        with self.lock:
+            enableArms = self.getParameter("Arms movement enabled")
+            self.motion.setMoveArmsEnabled(enableArms, enableArms)
+            x = self.getParameter("X")
+            y = self.getParameter("Y")
+            theta = self.getParameter("Theta")
+            period = self.getParameter("Period of direction update (s)")
+            epsilon = 0.0001
+            dx = math.fabs(x - self.x)
+            dy = math.fabs(y - self.y)
+            dt = math.fabs(theta - self.theta)
+
+            # Update moveToward parameters
+            if(dx > epsilon or dy > epsilon or dt > epsilon):
+                self.x=x
+                self.y=y
+                self.theta=theta
+                self.motion.moveToward(self.x, self.y, self.theta)
+
+            # Check if the move has been canceled
+            if (not self.motion.moveIsActive()):
+                self.moveFailed()
+
+            us_period = int(period*1000000)
+            self.ptask.setUsPeriod(us_period)
+    #end - move code]]>
+</content>
+                            </script>
+                            <Input name="onLoad" type="1" type_size="1" nature="0" inner="1" tooltip="Signal sent when diagram is loaded." id="1" />
+                            <Input name="onStart" type="1" type_size="1" nature="2" inner="0" tooltip="Box behavior starts when a signal is received on this input." id="2" />
+                            <Input name="onStop" type="1" type_size="1" nature="3" inner="0" tooltip="Box behavior stops when a signal is received on this input." id="3" />
+                            <Input name="peopleId" type="0" type_size="1" nature="1" inner="0" tooltip="List of people id to track" id="4" />
+                            <Output name="onStopped" type="1" type_size="1" nature="1" inner="0" tooltip="Signal sent when box behavior is finished." id="5" />
+                            <Output name="targetLost" type="1" type_size="1" nature="2" inner="0" tooltip="Signal sent when the target is lost." id="6" />
+                            <Output name="targetReached" type="1" type_size="1" nature="2" inner="0" tooltip="Signal sent when the target is reached." id="7" />
+                            <Parameter name="Mode" inherits_from_parent="0" content_type="3" value="WholeBody" default_value="Head" custom_choice="0" tooltip="Set tracker mode" id="8">
+                                <Choice value="Head" />
+                                <Choice value="WholeBody" />
+                                <Choice value="Move" />
+                            </Parameter>
+                            <Parameter name="Effector" inherits_from_parent="0" content_type="3" value="Arms" default_value="None" custom_choice="0" tooltip="Set effector to use for tracking. Head is always used." id="9">
+                                <Choice value="None" />
+                                <Choice value="Arms" />
+                                <Choice value="LArm" />
+                                <Choice value="RArm" />
+                            </Parameter>
+                            <Parameter name="Distance X (m)" inherits_from_parent="0" content_type="2" value="0.711719" default_value="0.3" min="0.01" max="5" tooltip="Distance on X axis the robot will try to maintain from its target in move modes." id="10" />
+                            <Parameter name="Threshold X (m)" inherits_from_parent="0" content_type="2" value="0.1" default_value="0.1" min="0.01" max="1" tooltip="Threshold above which the robot will move to track its target in move modes." id="11" />
+                            <Parameter name="Distance Y (m)" inherits_from_parent="0" content_type="2" value="0" default_value="0" min="-5" max="5" tooltip="Distance on Y axis the robot will try to maintain from its target in move modes." id="12" />
+                            <Parameter name="Threshold Y (m)" inherits_from_parent="0" content_type="2" value="0.1" default_value="0.1" min="0.01" max="1" tooltip="Threshold above which the robot will move to track its target in move modes." id="13" />
+                            <Parameter name="Theta (rad)" inherits_from_parent="0" content_type="2" value="0" default_value="0" min="-3.14" max="3.14" tooltip="Wz angle of the vector robot-target the robot will try to maintain in move modes." id="14" />
+                            <Parameter name="Threshold Theta (rad)" inherits_from_parent="0" content_type="2" value="0.3" default_value="0.3" min="0.01" max="3.14" tooltip="Threshold of the angle of the vector robot-target above which the robot will move to track its target in move modes." id="15" />
+                            <Parameter name="MoveToward" inherits_from_parent="1" content_type="2" value="1" default_value="0" min="-1" max="1" tooltip="" id="16" />
+                        </Box>
+                        <Box name="Zombie20160603Fri1629" id="14" localization="-1" tooltip="This box makes the robot track people with different modes." x="1039" y="729">
+                            <bitmap>media/images/box/interaction/target_face.png</bitmap>
+                            <script language="4">
+                                <content>
+                                    <![CDATA[import time
+
+class MyClass(GeneratedClass):
+    def __init__(self):
+        GeneratedClass.__init__(self)
+        self.tracker = ALProxy( "ALTracker" )
+        self.memory = ALProxy("ALMemory")
+        self.targetName = "People"
+        self.distanceX = 0.0
+        self.distanceY = 0.0
+        self.angleWz = 0.0
+        self.thresholdX = 0.0
+        self.thresholdY = 0.0
+        self.thresholdWz = 0.0
+        self.effector = "None"
+        self.subscribeDone = False
+        self.isRunning = False
+
+    def onLoad(self):
+        #start - move code
+        import threading
+        self.motion = ALProxy("ALMotion")
+        self.x = 0
+        self.y = 0
+        self.theta = 0
+        self.ptask = qi.PeriodicTask()
+        self.lock = threading.RLock()
+        #end - move code
+        self.BIND_PYTHON(self.getName(), "setParameter")
+        self.BIND_PYTHON(self.getName(), "onTargetLost")
+        self.BIND_PYTHON(self.getName(), "onTargetReached")
+        self.BIND_PYTHON(self.getName(), "onTargetChanged")
+        self.memory.subscribeToEvent("ALTracker/ActiveTargetChanged", self.getName(), "onTargetChanged")
+
+    def onUnload(self):
+        #start - move code
+        with self.lock:
+            self.ptask.stop()
+            self.x = 0
+            self.y = 0
+            self.theta = 0
+            self.motion.moveToward(0, 0, 0)
+            self.motion.waitUntilMoveIsFinished()
+        #end - move code
+        if self.subscribeDone:
+            self.memory.unsubscribeToEvent("ALTracker/TargetLost", self.getName())
+            self.memory.unsubscribeToEvent("ALTracker/TargetReached", self.getName())
+            self.subscribeDone = False
+
+        if self.isRunning:
+            self.tracker.setEffector("None")
+            self.tracker.stopTracker()
+            self.tracker.unregisterTarget(self.targetName)
+            self.isRunning = False
+
+    def onInput_onStart(self):
+        #start - move code
+        with self.lock:
+            #period = self.getParameter("Period of direction update (s)")
+            #us_period = int(period*1000000)
+            us_period = int(1000000)
+
+            self.ptask.compensateCallbackTime(True)
+            self.ptask.setCallback(self.updateMovement)
+            self.ptask.setUsPeriod(us_period)
+            self.ptask.start(True)
+        #end - move code
+        self.memory.subscribeToEvent("ALTracker/TargetLost", self.getName(), "onTargetLost")
+        self.memory.subscribeToEvent("ALTracker/TargetReached", self.getName(), "onTargetReached")
+        self.subscribeDone = True
+
+        mode = self.getParameter("Mode")
+        self.distanceX = self.getParameter("Distance X (m)")
+        self.thresholdX = self.getParameter("Threshold X (m)")
+        self.distanceY = self.getParameter("Distance Y (m)")
+        self.thresholdY = self.getParameter("Threshold Y (m)")
+        self.angleWz = self.getParameter("Theta (rad)")
+        self.thresholdWz = self.getParameter("Threshold Theta (rad)")
+        self.effector = self.getParameter("Effector")
+
+        self.tracker.setEffector(self.effector)
+
+        peopleIds = []
+
+        self.tracker.registerTarget(self.targetName, peopleIds)
+        self.tracker.setRelativePosition([-self.distanceX, self.distanceY, self.angleWz,
+                                           self.thresholdX, self.thresholdY, self.thresholdWz])
+        self.tracker.setMode(mode)
+
+        self.tracker.track(self.targetName) #Start tracker
+        self.isRunning = True
+
+    def onInput_onStop(self):
+        self.onStopped()
+        self.onUnload()
+
+    def onInput_peopleId(self, p):
+        if(p is None):
+            return
+
+        self.tracker.registerTarget(self.targetName, p)
+
+    def setParameter(self, parameterName, newValue):
+        GeneratedClass.setParameter(self, parameterName, newValue)
+        if (parameterName == 'Mode'):
+            self.tracker.setMode(newValue)
+            return
+
+        if (parameterName == "Distance X (m)"):
+            self.distanceX = newValue
+            self.tracker.setRelativePosition([-self.distanceX, self.distanceY, self.angleWz,
+                                               self.thresholdX, self.thresholdY, self.thresholdWz])
+            return
+
+        if (parameterName == "Distance Y (m)"):
+            self.distanceY = newValue
+            self.tracker.setRelativePosition([-self.distanceX, self.distanceY, self.angleWz,
+                                               self.thresholdX, self.thresholdY, self.thresholdWz])
+            return
+
+        if (parameterName == "Theta (rad)"):
+            self.angleWz = newValue
+            self.tracker.setRelativePosition([-self.distanceX, self.distanceY, self.angleWz,
+                                               self.thresholdX, self.thresholdY, self.thresholdWz])
+            return
+
+        if (parameterName == "Threshold X (m)"):
+            self.thresholdX = newValue
+            self.tracker.setRelativePosition([-self.distanceX, self.distanceY, self.angleWz,
+                                               self.thresholdX, self.thresholdY, self.thresholdWz])
+            return
+
+        if (parameterName == "Threshold Y (m)"):
+            self.thresholdY = newValue
+            self.tracker.setRelativePosition([-self.distanceX, self.distanceY, self.angleWz,
+                                               self.thresholdX, self.thresholdY, self.thresholdWz])
+            return
+
+        if (parameterName == "Threshold Theta (rad)"):
+            self.thresholdWz = newValue
+            self.tracker.setRelativePosition([-self.distanceX, self.distanceY, self.angleWz,
+                                               self.thresholdX, self.thresholdY, self.thresholdWz])
+            return
+
+        if(parameterName == "Effector"):
+            self.tracker.setEffector(newValue)
+            self.effector = newValue
+            return
+
+    def onTargetLost(self, key, value, message):
+        self.targetLost()
+
+    def onTargetReached(self, key, value, message):
+        self.targetReached()
+
+    def onTargetChanged(self, key, value, message):
+        if value == self.targetName and not self.subscribeDone:
+            self.memory.subscribeToEvent("ALTracker/TargetLost", self.getName(), "onTargetLost")
+            self.memory.subscribeToEvent("ALTracker/TargetReached", self.getName(), "onTargetReached")
+            self.subscribeDone = True
+        elif value != self.targetName and self.subscribeDone:
+            self.memory.unsubscribeToEvent("ALTracker/TargetLost", self.getName())
+            self.memory.unsubscribeToEvent("ALTracker/TargetReached", self.getName())
+            self.subscribeDone = False
+
+    #start - move code
+    def moveFailed(self):
+        self.onUnload()
+        self.onMoveFailed()
+
+    def updateMovement(self):
+        import math
+        with self.lock:
+            enableArms = self.getParameter("Arms movement enabled")
+            self.motion.setMoveArmsEnabled(enableArms, enableArms)
+            x = self.getParameter("X")
+            y = self.getParameter("Y")
+            theta = self.getParameter("Theta")
+            period = self.getParameter("Period of direction update (s)")
+            epsilon = 0.0001
+            dx = math.fabs(x - self.x)
+            dy = math.fabs(y - self.y)
+            dt = math.fabs(theta - self.theta)
+
+            # Update moveToward parameters
+            if(dx > epsilon or dy > epsilon or dt > epsilon):
+                self.x=x
+                self.y=y
+                self.theta=theta
+                self.motion.moveToward(self.x, self.y, self.theta)
+
+            # Check if the move has been canceled
+            if (not self.motion.moveIsActive()):
+                self.moveFailed()
+
+            us_period = int(period*1000000)
+            self.ptask.setUsPeriod(us_period)
+    #end - move code]]>
+</content>
+                            </script>
+                            <Input name="onLoad" type="1" type_size="1" nature="0" inner="1" tooltip="Signal sent when diagram is loaded." id="1" />
+                            <Input name="onStart" type="1" type_size="1" nature="2" inner="0" tooltip="Box behavior starts when a signal is received on this input." id="2" />
+                            <Input name="onStop" type="1" type_size="1" nature="3" inner="0" tooltip="Box behavior stops when a signal is received on this input." id="3" />
+                            <Input name="peopleId" type="0" type_size="1" nature="1" inner="0" tooltip="List of people id to track" id="4" />
+                            <Output name="onStopped" type="1" type_size="1" nature="1" inner="0" tooltip="Signal sent when box behavior is finished." id="5" />
+                            <Output name="targetLost" type="1" type_size="1" nature="2" inner="0" tooltip="Signal sent when the target is lost." id="6" />
+                            <Output name="targetReached" type="1" type_size="1" nature="2" inner="0" tooltip="Signal sent when the target is reached." id="7" />
+                            <Parameter name="Mode" inherits_from_parent="0" content_type="3" value="WholeBody" default_value="Head" custom_choice="0" tooltip="Set tracker mode" id="8">
+                                <Choice value="Head" />
+                                <Choice value="WholeBody" />
+                                <Choice value="Move" />
+                            </Parameter>
+                            <Parameter name="Effector" inherits_from_parent="0" content_type="3" value="Arms" default_value="None" custom_choice="0" tooltip="Set effector to use for tracking. Head is always used." id="9">
+                                <Choice value="None" />
+                                <Choice value="Arms" />
+                                <Choice value="LArm" />
+                                <Choice value="RArm" />
+                            </Parameter>
+                            <Parameter name="Distance X (m)" inherits_from_parent="0" content_type="2" value="0.711719" default_value="0.3" min="0.01" max="5" tooltip="Distance on X axis the robot will try to maintain from its target in move modes." id="10" />
+                            <Parameter name="Threshold X (m)" inherits_from_parent="0" content_type="2" value="0.1" default_value="0.1" min="0.01" max="1" tooltip="Threshold above which the robot will move to track its target in move modes." id="11" />
+                            <Parameter name="Distance Y (m)" inherits_from_parent="0" content_type="2" value="0" default_value="0" min="-5" max="5" tooltip="Distance on Y axis the robot will try to maintain from its target in move modes." id="12" />
+                            <Parameter name="Threshold Y (m)" inherits_from_parent="0" content_type="2" value="0.1" default_value="0.1" min="0.01" max="1" tooltip="Threshold above which the robot will move to track its target in move modes." id="13" />
+                            <Parameter name="Theta (rad)" inherits_from_parent="0" content_type="2" value="0" default_value="0" min="-3.14" max="3.14" tooltip="Wz angle of the vector robot-target the robot will try to maintain in move modes." id="14" />
+                            <Parameter name="Threshold Theta (rad)" inherits_from_parent="0" content_type="2" value="0.3" default_value="0.3" min="0.01" max="3.14" tooltip="Threshold of the angle of the vector robot-target above which the robot will move to track its target in move modes." id="15" />
+                            <Parameter name="MoveToward" inherits_from_parent="1" content_type="2" value="1" default_value="0" min="-1" max="1" tooltip="" id="16" />
+                        </Box>
+                        <Link inputowner="0" indexofinput="4" outputowner="12" indexofoutput="5" />
+                        <Link inputowner="0" indexofinput="4" outputowner="3" indexofoutput="5" />
+                        <Link inputowner="0" indexofinput="4" outputowner="6" indexofoutput="5" />
+                        <Link inputowner="0" indexofinput="4" outputowner="9" indexofoutput="5" />
+                        <Link inputowner="0" indexofinput="4" outputowner="11" indexofoutput="5" />
+                        <Link inputowner="0" indexofinput="4" outputowner="13" indexofoutput="5" />
+                    </Diagram>
+                </BehaviorKeyframe>
+            </BehaviorLayer>
+        </Timeline>
+    </Box>
+</ChoregrapheProject>
