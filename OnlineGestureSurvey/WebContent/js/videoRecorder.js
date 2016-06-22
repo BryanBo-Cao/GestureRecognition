@@ -153,11 +153,12 @@ function onBtnNextClicked() {
         // code for older browsers
 		request = new ActiveXObject("Microsoft.XMLHTTP");
 	}
-    var insertVideoURL = "http://localhost/GestureRobotsMovements/OnlineGestureSurvey/WebContent/insertVideoDataIntoDatabase.php";
+//    var insertVideoURL = "http://localhost/GestureRobotsMovements/OnlineGestureSurvey/WebContent/insertVideoDataIntoDatabase.php";
+    var insertVideoURL = "http://localhost/GestureRobotsMovements/OnlineGestureSurvey/WebContent/insertVideoDataIntoFileSystem.php";
     request.open("POST", insertVideoURL);
     request.send(formData);
-    
-//	window.location="./1.1.2.php";
+    alert(blob);
+//	window.location= insertVideoURL;
 }
 //end ====== added by github.com/BryanBo-Cao
 
